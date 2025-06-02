@@ -1,0 +1,258 @@
+﻿{% extends 'base.html' %}
+
+{% block extra_head %}
+<style>
+    .card {
+        margin-bottom: 20px;
+    }
+    .source-card {
+        height: 100%;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+    }
+    .modal-backdrop {
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="app">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">Service Providers</h1>
+        <button class="btn btn-primary" @click="showAddModal">
+            <i class="bi bi-plus"></i> Add New Provider
+        </button>
+    </div>
+
+    <div class="alert alert-info" v-if="loading">
+        <div class="spinner-border spinner-border-sm" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading providers...
+    </div>
+
+    <div class="alert alert-danger" v-if="error">
+        [[ error ]]
+    </div>
+
+    <div class="row" v-if="!loading && !error">
+        <div v-if="sources.length === 0" class="col-12">
+            <div class="alert alert-warning">
+                No providers found. Click "Add New Provider" to create one.
+            </div>
+        </div>
+        <div v-for="source in sources" :key="source.id" class="col-md-4 mb-4">
+            <div class="card source-card">
+                <div class="card-body">
+                    <h5 class="card-title">[[ source.name ]]</h5>
+                    <p class="card-text">
+                        <strong>URL:</strong> <a :href="source.url" target="_blank">[[ source.url ]]</a>
+                    </p>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            Created: [[ formatDate(source.createdAt) ]]<br>
+                            Updated: [[ formatDate(source.updatedAt) ]]
+                        </small>
+                    </p>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm btn-primary" @click="showEditModal(source)">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <button class="btn btn-sm btn-danger" @click="confirmDelete(source)">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Source Modal -->
+    <div class="modal fade" id="sourceModal" tabindex="-1" aria-labelledby="sourceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sourceModalLabel">[[ editMode ? 'Edit' : 'Add' ]] Provider</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger" v-if="formError">
+                        [[ formError ]]
+                    </div>
+                    <form @submit.prevent="saveSource">
+                        <div class="mb-3">
+                            <label for="sourceName" class="form-label">Name</label>
+                            <input type="text" class="form-control" id="sourceName" v-model="currentSource.name" required maxlength="100">
+                            <div class="form-text">Required, maximum 100 characters</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sourceUrl" class="form-label">URL</label>
+                            <input type="url" class="form-control" id="sourceUrl" v-model="currentSource.url" required maxlength="500">
+                            <div class="form-text">Required, must be a valid URL, maximum 500 characters</div>
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" :disabled="formSubmitting">
+                                <span v-if="formSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                Save
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the provider "[[ currentSource.name ]]"?</p>
+                    <p class="text-danger">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" @click="deleteSource" :disabled="formSubmitting">
+                        <span v-if="formSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Get the playlist manager URL from Django context
+    const playlistManagerUrl = `${window.location.protocol}//${window.location.host}` + "{{ playlist_manager_url }}";
+
+    // Create Vue app
+    const app = new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            sources: [],
+            loading: true,
+            error: null,
+            currentSource: {
+                id: null,
+                name: '',
+                url: ''
+            },
+            editMode: false,
+            formError: null,
+            formSubmitting: false,
+            sourceModal: null,
+            deleteModal: null,
+            apiBaseUrl: playlistManagerUrl
+        },
+        mounted() {
+            this.fetchSources();
+            this.sourceModal = new bootstrap.Modal(document.getElementById('sourceModal'));
+            this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        },
+        methods: {
+            fetchSources() {
+                this.loading = true;
+                this.error = null;
+
+                axios.get(`${this.apiBaseUrl}/sources`)
+                    .then(response => {
+                        this.sources = response.data;
+                        this.loading = false;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching sources:', error);
+                        this.error = 'Failed to load playlist sources. Please try again later.';
+                        this.loading = false;
+                    });
+            },
+            showAddModal() {
+                this.editMode = false;
+                this.currentSource = {
+                    id: null,
+                    name: '',
+                    url: ''
+                };
+                this.formError = null;
+                this.sourceModal.show();
+            },
+            showEditModal(source) {
+                this.editMode = true;
+                this.currentSource = {
+                    id: source.id,
+                    name: source.name,
+                    url: source.url
+                };
+                this.formError = null;
+                this.sourceModal.show();
+            },
+            saveSource() {
+                this.formSubmitting = true;
+                this.formError = null;
+
+                const payload = {
+                    name: this.currentSource.name,
+                    url: this.currentSource.url
+                };
+
+                const request = this.editMode
+                    ? axios.put(`${this.apiBaseUrl}/sources/${this.currentSource.id}`, payload)
+                    : axios.post(`${this.apiBaseUrl}/sources`, payload);
+
+                request
+                    .then(() => {
+                        this.sourceModal.hide();
+                        this.fetchSources();
+                        this.formSubmitting = false;
+                    })
+                    .catch(error => {
+                        console.error('Error saving source:', error);
+                        this.formError = 'Failed to save playlist source. Please check your input and try again.';
+                        this.formSubmitting = false;
+                    });
+            },
+            confirmDelete(source) {
+                this.currentSource = {
+                    id: source.id,
+                    name: source.name,
+                    url: source.url
+                };
+                this.deleteModal.show();
+            },
+            deleteSource() {
+                this.formSubmitting = true;
+
+                axios.delete(`${this.apiBaseUrl}/sources/${this.currentSource.id}`)
+                    .then(() => {
+                        this.deleteModal.hide();
+                        this.fetchSources();
+                        this.formSubmitting = false;
+                    })
+                    .catch(error => {
+                        console.error('Error deleting source:', error);
+                        this.formSubmitting = false;
+                        // Show error in delete modal
+                        document.querySelector('#deleteModal .modal-body').innerHTML += 
+                            `<div class="alert alert-danger mt-3">Failed to delete playlist source. Please try again later.</div>`;
+                    });
+            },
+            formatDate(dateString) {
+                if (!dateString) return 'N/A';
+                const date = new Date(dateString);
+                return date.toLocaleString();
+            }
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,252 @@
+﻿{% extends 'base.html' %}
+
+{% block extra_head %}
+<style>
+    .card {
+        margin-bottom: 20px;
+    }
+    .stats-card {
+        height: 100%;
+    }
+    .stats-value {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    .stats-label {
+        font-size: 1rem;
+        color: #6c757d;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="app">
+    <h1 class="h2 mb-4">Dashboard</h1>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Server Time</h5>
+                    <p class="stats-value">[[ serverTime ]]</p>
+                    <p class="stats-label">Current server time</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">CPU Usage</h5>
+                    <p class="stats-value">[[ cpuPercent ]]%</p>
+                    <p class="stats-label">Current CPU utilization</p>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" :style="{ width: cpuPercent + '%' }" :aria-valuenow="cpuPercent" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Memory Usage</h5>
+                    <p class="stats-value">[[ memoryPercent ]]%</p>
+                    <p class="stats-label">[[ memoryUsed ]] GB / [[ memoryTotal ]] GB</p>
+                    <div class="progress">
+                        <div class="progress-bar bg-info" role="progressbar" :style="{ width: memoryPercent + '%' }" :aria-valuenow="memoryPercent" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">CPU Usage History</h5>
+                    <div class="chart-container">
+                        <canvas id="cpuChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Memory Usage History</h5>
+                    <div class="chart-container">
+                        <canvas id="memoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Initialize charts
+    let cpuChart, memoryChart;
+    const maxDataPoints = 60; // Show last 60 seconds of data
+
+    // Initialize data arrays
+    const cpuData = Array(maxDataPoints).fill(0);
+    const memoryData = Array(maxDataPoints).fill(0);
+    const timeLabels = Array(maxDataPoints).fill('');
+
+    // Create Vue app
+    const app = new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            serverTime: '--:--:--',
+            cpuPercent: 0,
+            memoryPercent: 0,
+            memoryUsed: 0,
+            memoryTotal: 0,
+            socket: null
+        },
+        mounted() {
+            this.initCharts();
+            this.connectWebSocket();
+        },
+        beforeDestroy() {
+            if (this.socket) {
+                this.socket.close();
+            }
+        },
+        methods: {
+            initCharts() {
+                // CPU Chart
+                const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+                cpuChart = new Chart(cpuCtx, {
+                    type: 'line',
+                    data: {
+                        labels: timeLabels,
+                        datasets: [{
+                            label: 'CPU Usage (%)',
+                            data: cpuData,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100
+                            }
+                        },
+                        animation: {
+                            duration: 0
+                        }
+                    }
+                });
+
+                // Memory Chart
+                const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+                memoryChart = new Chart(memoryCtx, {
+                    type: 'line',
+                    data: {
+                        labels: timeLabels,
+                        datasets: [{
+                            label: 'Memory Usage (%)',
+                            data: memoryData,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100
+                            }
+                        },
+                        animation: {
+                            duration: 0
+                        }
+                    }
+                });
+            },
+            connectWebSocket() {
+                // Create WebSocket connection
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/system-stats/`;
+
+                this.socket = new WebSocket(wsUrl);
+
+                // Connection opened
+                this.socket.addEventListener('open', (event) => {
+                    console.log('WebSocket connected');
+                });
+
+                // Listen for messages
+                this.socket.addEventListener('message', (event) => {
+                    const data = JSON.parse(event.data);
+
+                    // Update Vue data
+                    this.serverTime = data.time;
+                    this.cpuPercent = data.cpu_percent;
+                    this.memoryPercent = data.memory_percent;
+                    this.memoryUsed = data.memory_used;
+                    this.memoryTotal = data.memory_total;
+
+                    // Update chart data
+                    this.updateChartData(data);
+                });
+
+                // Connection closed
+                this.socket.addEventListener('close', (event) => {
+                    console.log('WebSocket disconnected');
+                    // Try to reconnect after 3 seconds
+                    setTimeout(() => {
+                        this.connectWebSocket();
+                    }, 3000);
+                });
+
+                // Connection error
+                this.socket.addEventListener('error', (event) => {
+                    console.error('WebSocket error:', event);
+                });
+            },
+            updateChartData(data) {
+                // Remove first element and add new data point
+                cpuData.shift();
+                cpuData.push(data.cpu_percent);
+
+                memoryData.shift();
+                memoryData.push(data.memory_percent);
+
+                // Update time labels
+                const time = data.time.split(' ')[1]; // Extract time part
+                timeLabels.shift();
+                timeLabels.push(time);
+
+                // Update charts
+                cpuChart.update();
+                memoryChart.update();
+            }
+        }
+    });
+</script>
+{% endblock %}

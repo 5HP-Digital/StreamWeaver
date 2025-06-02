@@ -1,0 +1,11 @@
+@IPTV.PlaylistManager_HostAddress = http://localhost:5249
+
+GET {{IPTV.PlaylistManager_HostAddress}}/sources/
+Accept: application/json
+
+###
+
+GET {{IPTV.PlaylistManager_HostAddress}}/sources/1
+Accept: application/json
+
+###

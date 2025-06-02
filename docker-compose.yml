@@ -1,0 +1,92 @@
+﻿services:
+
+  kong:
+    image: kong:latest
+    environment:
+      - KONG_DATABASE=off
+#      - KONG_PG_HOST=db
+#      - KONG_PG_USER=postgres
+#      - KONG_PG_PASSWORD=postgres
+      - KONG_DECLARATIVE_CONFIG=/etc/kong/kong.yml
+      - KONG_ADMIN_LISTEN=0.0.0.0:8001
+      - KONG_ADMIN_GUI_URL=http://localhost:8002
+      - KONG_PROXY_ACCESS_LOG=/dev/stdout
+      - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+      - KONG_PROXY_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_ERROR_LOG=/dev/stderr
+    volumes:
+      - ./config/kong/kong.yml:/etc/kong/kong.yml
+    ports:
+      - "8000-8004:8000-8004"
+      - "8443-8445:8443-8445"
+    depends_on:
+      - web
+      - playlist-manager
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    build:
+      context: ./iptv_manager
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - POSTGRES_DB=iptv_manager
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - PLAYLIST_MANAGER_URL=/api/playlist-manager
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  playlist-manager:
+    build:
+      context: ./IPTV.PlaylistManager
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - POSTGRES_DB=playlist_manager
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+
+  db:
+    image: postgres:17-alpine
+    restart: always
+    shm_size: 128mb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
