@@ -92,39 +92,39 @@ public class SourcesController(AppDbContext context, PlaylistReader playlistRead
         return NoContent();
     }
 
-    [HttpGet("{id}/channels")]
-    public async Task<ActionResult<IEnumerable<PlaylistChannelModel>>> GetSourceChannels(long id,
-        CancellationToken cancellationToken)
-    {
-        var source = await context.PlaylistSources.FindAsync([id], cancellationToken: cancellationToken);
-        if (source == null)
-        {
-            return NotFound();
-        }
-
-        try
-        {
-            var document = await playlistReader.ReadAsync(source.Url, cancellationToken);
-
-            return document.Channels.Select(entry => new PlaylistChannelModel
-            {
-                MediaUrl = entry.MediaUrl,
-                TvgId = entry.TvgId,
-                TvgName = entry.TvgName,
-                TvgChannelNumber = entry.TvgChannelNumber,
-                ChannelId = entry.ChannelId,
-                ChannelNumber = entry.ChannelNumber,
-                Duration = entry.Duration,
-                Title = entry.Title,
-                LogoUrl = entry.LogoUrl,
-                GroupTitle = entry.GroupTitle
-            }).ToList();
-        }
-        catch (PlaylistException ex)
-        {
-            return Problem($"Failed to process playlist: {ex.Message}", statusCode: 500);
-        }
-    }
+    // [HttpGet("{id}/channels")]
+    // public async Task<ActionResult<IEnumerable<PlaylistChannelModel>>> GetSourceChannels(long id,
+    //     CancellationToken cancellationToken)
+    // {
+    //     var source = await context.PlaylistSources.FindAsync([id], cancellationToken: cancellationToken);
+    //     if (source == null)
+    //     {
+    //         return NotFound();
+    //     }
+    //
+    //     try
+    //     {
+    //         var document = await playlistReader.ReadAsync(source.Url, cancellationToken);
+    //
+    //         return document.Channels.Select(entry => new PlaylistChannelModel
+    //         {
+    //             MediaUrl = entry.MediaUrl,
+    //             TvgId = entry.TvgId,
+    //             TvgName = entry.TvgName,
+    //             TvgChannelNumber = entry.TvgChannelNumber,
+    //             ChannelId = entry.ChannelId,
+    //             ChannelNumber = entry.ChannelNumber,
+    //             Duration = entry.Duration,
+    //             Title = entry.Title,
+    //             LogoUrl = entry.LogoUrl,
+    //             GroupTitle = entry.GroupTitle
+    //         }).ToList();
+    //     }
+    //     catch (PlaylistException ex)
+    //     {
+    //         return Problem($"Failed to process playlist: {ex.Message}", statusCode: 500);
+    //     }
+    // }
     
     private async Task<bool> SourceExists(long id)
     {

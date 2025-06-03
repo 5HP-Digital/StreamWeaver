@@ -12,5 +12,7 @@ public class PlaylistSource : IEntity
     
     public DateTime UpdatedAt { get; set; }
     
+    // Navigation properties
+    public ICollection<PlaylistSourceChannel> Channels { get; init; } = [];
     public ICollection<PlaylistSourceInvocation> Invocations { get; init; } = [];
 }
