@@ -71,11 +71,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'iptv_manager.wsgi.application'
 ASGI_APPLICATION = 'iptv_manager.asgi.application'
 
+# Config Store
+CONFIG_PATH = os.environ.get('CONFIG_PATH', './config')
+
 # Database
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': os.path.join(CONFIG_PATH, 'db.sqlite3'),
     }
 }
 

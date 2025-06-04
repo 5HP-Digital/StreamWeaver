@@ -7,4 +7,5 @@ urlpatterns = [
     path('server-time/', views.ServerTimeView.as_view(), name='server-time'),
     path('resource-utilization/', views.ResourceUtilizationView.as_view(), name='resource-utilization'),
     path('health/', views.HealthCheckView.as_view(), name='health'),
+    path('settings/', views.SettingsView.as_view(), name='settings'),
 ]

@@ -16,3 +16,28 @@ class ResourceUtilizationSerializer(serializers.Serializer):
     memory_percent = serializers.FloatField()
     memory_used = serializers.FloatField()
     memory_total = serializers.FloatField()
+
+class SyncScheduleSerializer(serializers.Serializer):
+    """Serializer for sync schedule settings."""
+    daily = serializers.BooleanField(default=False)
+    times = serializers.DictField(
+        child=serializers.ListField(
+            child=serializers.TimeField(),
+            allow_empty=True
+        ),
+        default=dict
+    )
+
+class SettingsSerializer(serializers.Serializer):
+    """Serializer for IPTV settings."""
+    sync_enabled = serializers.BooleanField(default=False)
+    sync_schedule = SyncScheduleSerializer(default=dict)
+    allow_channel_auto_deletion = serializers.BooleanField(default=True)
+
+    def create(self, validated_data):
+        """Not used for this serializer."""
+        return validated_data
+
+    def update(self, instance, validated_data):
+        """Not used for this serializer."""
+        return validated_data

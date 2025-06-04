@@ -23,7 +23,7 @@ var/
 # Django
 *.log
 local_settings.py
-db.sqlite3
+iptv_manager/config/db.sqlite3
 db.sqlite3-journal
 media
 
@@ -46,36 +46,5 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# .NET
-bin/
-obj/
-[Dd]ebug/
-[Rr]elease/
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-*.dll
-*.pdb
-*.cache
-*.vs/
-*.[Cc]ache
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-
-# Rider specific
-*.sln.iml
-.idea/**/workspace.xml
-.idea/**/tasks.xml
-.idea/**/usage.statistics.xml
-.idea/**/dictionaries
-.idea/**/shelf
-.idea/**/contentModel.xml
-.idea/**/dataSources/
-.idea/**/dataSources.ids
-.idea/**/dataSources.local.xml
-.idea/**/sqlDataSources.xml
-.idea/**/dynamic.xml
-.idea/**/uiDesigner.xml
-.idea/**/dbnavigator.xml
+# Config
+iptv_manager/config/

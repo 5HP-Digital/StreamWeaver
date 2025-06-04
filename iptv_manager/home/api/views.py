@@ -1,11 +1,13 @@
 ﻿import datetime
+import json
 import psutil
 from django.db import connection
 from django.db.utils import OperationalError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import ServerTimeSerializer, ResourceUtilizationSerializer
+from .serializers import ServerTimeSerializer, ResourceUtilizationSerializer, SettingsSerializer
+from iptv_manager.config_store import ConfigStore
 
 
 class ServerTimeView(APIView):
@@ -67,3 +69,39 @@ class HealthCheckView(APIView):
             "api_status": api_status,
             "web_status": web_status
         })
+
+
+class SettingsView(APIView):
+    """API view for IPTV settings."""
+
+    def get(self, request):
+        """Get the current settings."""
+        config_store = ConfigStore()
+        settings_data = config_store.get("iptv:settings")
+
+        if not settings_data:
+            # Default settings
+            settings_data = {
+                "sync_enabled": False,
+                "sync_schedule": {
+                    "daily": False,
+                    "times": {}
+                },
+                "allow_channel_auto_deletion": True
+            }
+            # Save default settings to config store
+            config_store.set("iptv:settings", settings_data)
+
+        serializer = SettingsSerializer(data=settings_data)
+        serializer.is_valid(raise_exception=True)
+
+        return Response(serializer.validated_data)
+
+    def put(self, request):
+        """Update the settings."""
+        serializer = SettingsSerializer(data=request.data)
+        if serializer.is_valid():
+            config_store = ConfigStore()
+            config_store.set("iptv:settings", serializer.validated_data)
+            return Response(serializer.validated_data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
