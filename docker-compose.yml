@@ -2,6 +2,7 @@
 
   kong:
     image: kong:latest
+    restart: always
     environment:
       - KONG_DATABASE=off
 #      - KONG_PG_HOST=db
@@ -22,6 +23,7 @@
     depends_on:
       - web
       - playlist-manager
+      - redisinsight
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
@@ -32,18 +34,23 @@
   web:
     build:
       context: ./iptv_manager
+    restart: always
     volumes:
       - .:/app
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      - POSTGRES_DB=iptv_manager
+      - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
       - PLAYLIST_MANAGER_URL=/api/playlist-manager
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
       interval: 10s
@@ -54,6 +61,7 @@
   playlist-manager:
     build:
       context: ./IPTV.PlaylistManager
+    restart: always
     depends_on:
       db:
         condition: service_healthy
@@ -88,5 +96,37 @@
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    restart: always
+    volumes:
+      - redisinsight_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "5540:5540"
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5540/api/health/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
 volumes:
   postgres_data:
+  redis_data:
+  redisinsight_data:
