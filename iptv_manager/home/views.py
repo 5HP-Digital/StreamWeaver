@@ -13,7 +13,4 @@ def iptv(request):
     """
     View for the IPTV page
     """
-    context = {
-        'playlist_manager_url': settings.PLAYLIST_MANAGER_URL
-    }
-    return render(request, 'home/iptv.html', context)
+    return render(request, 'home/iptv.html')

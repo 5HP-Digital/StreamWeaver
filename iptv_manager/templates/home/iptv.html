@@ -53,8 +53,8 @@
                     </p>
                     <p class="card-text">
                         <small class="text-muted">
-                            Created: [[ formatDate(source.createdAt) ]]<br>
-                            Updated: [[ formatDate(source.updatedAt) ]]
+                            Created: [[ formatDate(source.created_at) ]]<br>
+                            Updated: [[ formatDate(source.updated_at) ]]
                         </small>
                     </p>
                     <div class="action-buttons">
@@ -133,9 +133,6 @@
 
 {% block extra_js %}
 <script>
-    // Get the playlist manager URL from Django context
-    const playlistManagerUrl = `${window.location.protocol}//${window.location.host}` + "{{ playlist_manager_url }}";
-
     // Create Vue app
     const app = new Vue({
         el: '#app',
@@ -153,8 +150,7 @@
             formError: null,
             formSubmitting: false,
             sourceModal: null,
-            deleteModal: null,
-            apiBaseUrl: playlistManagerUrl
+            deleteModal: null
         },
         mounted() {
             this.fetchSources();
@@ -166,7 +162,7 @@
                 this.loading = true;
                 this.error = null;
 
-                axios.get(`${this.apiBaseUrl}/sources`)
+                axios.get('/api/sources')
                     .then(response => {
                         this.sources = response.data;
                         this.loading = false;
@@ -207,8 +203,8 @@
                 };
 
                 const request = this.editMode
-                    ? axios.put(`${this.apiBaseUrl}/sources/${this.currentSource.id}`, payload)
-                    : axios.post(`${this.apiBaseUrl}/sources`, payload);
+                    ? axios.put(`/api/sources/${this.currentSource.id}`, payload)
+                    : axios.post('/api/sources/', payload);
 
                 request
                     .then(() => {
@@ -233,7 +229,7 @@
             deleteSource() {
                 this.formSubmitting = true;
 
-                axios.delete(`${this.apiBaseUrl}/sources/${this.currentSource.id}`)
+                axios.delete(`/api/sources/${this.currentSource.id}`)
                     .then(() => {
                         this.deleteModal.hide();
                         this.fetchSources();

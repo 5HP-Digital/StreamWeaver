@@ -13,15 +13,22 @@ A web application for managing IPTV services, TV schedules, and more.
 
 - **Backend**: Django, Django REST Framework, Channels (WebSockets)
 - **Frontend**: Vue.js, Bootstrap 5, Chart.js
-- **Database**: PostgreSQL
-- **API Gateway**: Kong
+- **Database**: SQLite3
 - **Containerization**: Docker, Docker Compose
 
 ## Requirements
 
+### For Docker Setup
 - Docker and Docker Compose
 
+### For Local Setup
+- Python 3.12 or later
+- pip (Python package manager)
+- Git
+
 ## Setup and Installation
+
+### Using Docker (Recommended)
 
 1. Clone the repository:
    ```
@@ -39,40 +46,69 @@ A web application for managing IPTV services, TV schedules, and more.
    http://localhost:8000
    ```
 
-   Or through the API Gateway:
+### Without Docker
+
+1. Clone the repository:
    ```
-   http://localhost:8080/api/web/
+   git clone https://github.com/yourusername/iptv-manager.git
+   cd iptv-manager
    ```
 
-   Note: The API Gateway (Kong) is configured to serve the web UI directly at:
+2. Create and activate a virtual environment:
    ```
-   http://localhost:8080/
+   python -m venv venv
+   # On Windows
+   venv\Scripts\activate
+   # On macOS/Linux
+   source venv/bin/activate
+   ```
+
+3. Install dependencies:
+   ```
+   cd iptv_manager
+   pip install -r requirements.txt
+   ```
+
+4. Create a `.env` file in the `iptv_manager` directory with the following content:
+   ```
+   # Django settings
+   SECRET_KEY="your-secret-key"
+   DEBUG=True
+
+   # Database settings
+   # SQLite3 is used by default, no additional configuration needed
+
+   # CORS settings
+   CORS_ALLOW_ALL_ORIGINS=True
+   ```
+
+5. Apply database migrations:
+   ```
+   python manage.py migrate
+   ```
+
+6. Start the development server:
+   ```
+   # Using Django's development server
+   python manage.py runserver
+
+   # Or using Daphne (ASGI server, recommended for WebSocket support)
+   daphne -b 0.0.0.0 -p 8000 iptv_manager.asgi:application
+   ```
+
+7. Access the application in your browser:
+   ```
+   http://localhost:8000
    ```
 
 ## Environment Variables
 
-The application uses environment variables for configuration. These are stored in a `.env` file at the root of the project. A sample `.env` file is provided below:
+The application uses environment variables for configuration. These are stored in a `.env` file in the `iptv_manager` directory. A sample `.env` file is provided in the setup instructions above.
 
-```
-# Django settings
-SECRET_KEY=your-secret-key
-DEBUG=True
-
-# Database settings
-POSTGRES_DB=iptv_manager
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_HOST=db
-POSTGRES_PORT=5432
-
-# CORS settings
-CORS_ALLOW_ALL_ORIGINS=True
-```
-
-To use a different configuration:
-1. Create a `.env` file in the project root
-2. Set the appropriate values for your environment
-3. The application will automatically load these values
+Key environment variables include:
+- `SECRET_KEY`: Django's secret key for security
+- `DEBUG`: Set to True for development, False for production
+- `CORS_ALLOW_ALL_ORIGINS`: Controls CORS settings
 
 Note: The `.env` file is included in `.gitignore` to prevent sensitive information from being committed to the repository.
 
@@ -95,38 +131,38 @@ iptv_manager/
 
 ### Running Migrations
 
+#### With Docker
 ```
 docker-compose exec web python manage.py migrate
 ```
 
+#### Without Docker
+```
+# Make sure you're in the iptv_manager directory with your virtual environment activated
+python manage.py migrate
+```
+
 ### Creating a Superuser
 
+#### With Docker
 ```
 docker-compose exec web python manage.py createsuperuser
 ```
 
+#### Without Docker
+```
+# Make sure you're in the iptv_manager directory with your virtual environment activated
+python manage.py createsuperuser
+```
+
 ## API Endpoints
 
-All API endpoints are accessible directly or through the Kong API Gateway:
+The following API endpoints are available:
 
-- Direct access:
-  - `/api/server-time/` - Get current server time
-  - `/api/resource-utilization/` - Get CPU and memory usage
-
-- Via API Gateway:
-  - `/api/web/api/server-time/` - Get current server time
-  - `/api/web/api/resource-utilization/` - Get CPU and memory usage
-  - `/api/playlist-manager/...` - Access Playlist Manager endpoints
-
-## API Gateway
-
-The project uses Kong as an API Gateway to route requests to the appropriate backend services:
-
-- Web service (Django): `/api/web/*`
-- Playlist Manager service (.NET): `/api/playlist-manager/*`
-- Web UI (Django): `/` (serves the web UI directly)
-
-For more details on the API Gateway configuration, see the [Kong README](config/kong/README.md).
+- `/api/server-time/` - Get current server time
+- `/api/resource-utilization/` - Get CPU and memory usage
+- `/api/sources/` - Access playlist sources
+- `/api/sources/<id>/channels/` - Access channels for a specific source
 
 ## WebSocket Endpoints
 

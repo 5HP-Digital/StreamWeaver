@@ -2,8 +2,6 @@
 import psutil
 from django.db import connection
 from django.db.utils import OperationalError
-from django_redis import get_redis_connection
-from redis.exceptions import RedisError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -42,7 +40,7 @@ class ResourceUtilizationView(APIView):
 class HealthCheckView(APIView):
     """
     API view for health check
-    Verifies database connection, Redis connection, API and web responsiveness
+    Verifies database connection, API and web responsiveness
     """
     def get(self, request):
         # Check database connection
@@ -57,18 +55,6 @@ class HealthCheckView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
-        # Check Redis connection
-        try:
-            redis_conn = get_redis_connection("default")
-            redis_conn.ping()
-            redis_status = "ok"
-        except RedisError:
-            redis_status = "error"
-            return Response(
-                {"status": "error", "detail": "Redis connection failed", "redis_status": redis_status},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-
         # If we got here, API is responsive
         api_status = "ok"
 
@@ -78,7 +64,6 @@ class HealthCheckView(APIView):
         return Response({
             "status": "ok",
             "db_status": db_status,
-            "redis_status": redis_status,
             "api_status": api_status,
             "web_status": web_status
         })
