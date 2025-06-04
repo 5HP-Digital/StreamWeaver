@@ -7,6 +7,8 @@ public class PlaylistSourceModel
     public required string Name { get; init; }
     
     public required string Url { get; init; }
+
+    public bool IsEnabled { get; set; }
     
     public DateTime CreatedAt { get; init; }
     

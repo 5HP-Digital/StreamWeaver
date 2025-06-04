@@ -8,6 +8,7 @@ public class PlaylistSourceChannelModel
     public string MediaUrl { get; set; } = null!;
     public string? LogoUrl { get; set; }
     public string? Group { get; set; }
+    public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

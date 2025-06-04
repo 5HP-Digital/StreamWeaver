@@ -8,6 +8,8 @@ public class PlaylistSource : IEntity
     
     public required string Url { get; set; }
     
+    public bool IsEnabled { get; set; } = false;
+    
     public DateTime CreatedAt { get; set; }
     
     public DateTime UpdatedAt { get; set; }

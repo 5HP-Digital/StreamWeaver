@@ -49,7 +49,7 @@ public class SourcesController(AppDbContext context, PlaylistReader playlistRead
         return CreatedAtAction(nameof(GetSource), new { id = entity.Id }, entity);
     }
 
-    [HttpPut("{id}")]
+    [HttpPatch("{id}")]
     public async Task<IActionResult> UpdateSource(long id, PlaylistSourceUpdateModel model)
     {
         var existingSource = await context.PlaylistSources.FindAsync(id);
@@ -58,8 +58,9 @@ public class SourcesController(AppDbContext context, PlaylistReader playlistRead
             return NotFound();
         }
 
-        existingSource.Name = model.Name;
-        existingSource.Url = model.Url;
+        if (model.Name != null) existingSource.Name = model.Name;
+        if (model.Url != null) existingSource.Url = model.Url;
+        if (model.IsEnabled != null) existingSource.IsEnabled = model.IsEnabled.Value;
 
         try
         {
@@ -138,6 +139,7 @@ public class SourcesController(AppDbContext context, PlaylistReader playlistRead
             Id = source.Id,
             Name = source.Name,
             Url = source.Url,
+            IsEnabled = source.IsEnabled,
             CreatedAt = source.CreatedAt,
             UpdatedAt = source.UpdatedAt
         };

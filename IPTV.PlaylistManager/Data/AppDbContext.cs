@@ -28,6 +28,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             entity.Property(e => e.Name).HasColumnType("character varying(255)").IsRequired();
             entity.Property(e => e.Url).HasColumnType("text").IsRequired();
+            entity.Property(e => e.IsEnabled).HasDefaultValue(false);
             entity.Property(e => e.CreatedAt)
                 .HasColumnType("timestamp with time zone")
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
@@ -80,6 +81,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(e => e.Title)
                 .HasColumnType("character varying(255)")
                 .IsRequired(false);
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true);
             entity.Property(e => e.CreatedAt)
                 .HasColumnType("timestamp with time zone")
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
