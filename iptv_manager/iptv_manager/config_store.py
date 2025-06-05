@@ -38,7 +38,7 @@ class ConfigStore:
         """
         # Get the CONFIG_PATH from environment variables
         config_path = settings.CONFIG_PATH
-        
+
         # Create a Path object
         config_dir = Path(config_path)
         
@@ -102,7 +102,7 @@ class ConfigStore:
             os.makedirs(file_path.parent, exist_ok=True)
             
             with open(file_path, 'w') as f:
-                json.dump(value, f, indent=2)
+                json.dump(value, f, indent=2, sort_keys=True, default=str)
             return True
         except Exception as e:
             logger.error(f"Error writing configuration for key {key}: {str(e)}")

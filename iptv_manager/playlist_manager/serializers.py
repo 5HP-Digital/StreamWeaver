@@ -6,10 +6,28 @@ class PlaylistSourceSerializer(serializers.ModelSerializer):
     """
     Serializer for PlaylistSource model.
     """
+    channel_count = serializers.SerializerMethodField()
+    last_synced = serializers.SerializerMethodField()
+
     class Meta:
         model = PlaylistSource
-        fields = ['id', 'name', 'url', 'is_enabled', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'url', 'is_enabled', 'created_at', 'updated_at', 'channel_count', 'last_synced']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'channel_count', 'last_synced']
+
+    def get_channel_count(self, obj):
+        """
+        Get the number of channels associated with this PlaylistSource.
+        """
+        return obj.channels.count()
+
+    def get_last_synced(self, obj):
+        """
+        Get the date of the last successful invocation.
+        """
+        last_invocation = obj.invocations.filter(completed=True, error__isnull=True).order_by('-updated_at').first()
+        if last_invocation:
+            return last_invocation.created_at
+        return None
 
 
 class PlaylistSourceCreateSerializer(serializers.ModelSerializer):

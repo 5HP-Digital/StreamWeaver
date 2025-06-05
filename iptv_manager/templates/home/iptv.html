@@ -45,32 +45,55 @@
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Sync Schedule</label>
-                <div class="mb-2 form-check">
-                    <input type="checkbox" class="form-check-input" id="dailySync" v-model="settings.sync_schedule.daily" @change="onSettingsChange">
-                    <label class="form-check-label" for="dailySync">Run daily sync</label>
-                </div>
+                <label class="form-label">Sync Schedules</label>
 
-                <div v-if="!settings.sync_schedule.daily" class="mb-3">
-                    <label class="form-label">Schedule by day of week</label>
-                    <div v-for="(day, index) in daysOfWeek" :key="day" class="mb-2">
-                        <div class="d-flex align-items-center">
-                            <label class="form-label me-3 mb-0" style="width: 100px;">[[ day ]]</label>
-                            <div class="d-flex flex-wrap">
-                                <div v-for="(time, timeIndex) in getDayTimes(day.toLowerCase())" :key="timeIndex" class="me-2 mb-2">
-                                    <div class="input-group input-group-sm" style="width: 150px;">
-                                        <input type="time" class="form-control" v-model="settings.sync_schedule.times[day.toLowerCase()][timeIndex]" @change="onSettingsChange">
-                                        <button class="btn btn-outline-danger" type="button" @click="removeTime(day.toLowerCase(), timeIndex)">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
+                <div class="mb-3">
+                    <div v-for="(schedule, scheduleIndex) in settings.sync_schedules" :key="scheduleIndex" class="card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="card-title mb-0">Schedule #[[ scheduleIndex + 1 ]]</h6>
+                                <button class="btn btn-sm btn-outline-danger" @click="removeSchedule(scheduleIndex)">
+                                    <i class="bi bi-trash"></i> Remove
+                                </button>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Time</label>
+                                <input type="time" class="form-control" v-model="schedule.time" @change="onSettingsChange">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Days of Week</label>
+                                <div class="d-flex gap-2 mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" @click="applyQuickSchedule(scheduleIndex, 'all')">
+                                        All Week
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" @click="applyQuickSchedule(scheduleIndex, 'weekdays')">
+                                        All Weekdays (Mon-Fri)
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" @click="applyQuickSchedule(scheduleIndex, 'weekend')">
+                                        Weekend Only (Sat-Sun)
+                                    </button>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <div v-for="day in daysOfWeek" :key="day" class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                            :id="'day-' + scheduleIndex + '-' + day"
+                                            :value="day"
+                                            v-model="schedule.daysOfWeek"
+                                            @change="onSettingsChange">
+                                        <label class="form-check-label" :for="'day-' + scheduleIndex + '-' + day">
+                                            [[ day ]]
+                                        </label>
                                     </div>
                                 </div>
-                                <button class="btn btn-sm btn-outline-primary mb-2" @click="addTime(day.toLowerCase())">
-                                    <i class="bi bi-plus"></i> Add Time
-                                </button>
                             </div>
                         </div>
                     </div>
+
+                    <button class="btn btn-outline-primary" @click="addNewSchedule">
+                        <i class="bi bi-plus"></i> Add New Schedule
+                    </button>
                 </div>
             </div>
 
@@ -120,6 +143,10 @@
                     </div>
                     <p class="card-text">
                         <strong>URL:</strong> <a :href="source.url" target="_blank">[[ source.url ]]</a>
+                    </p>
+                    <p class="card-text">
+                        <strong>Channels:</strong> [[ source.channel_count || 0 ]]<br>
+                        <strong>Last Synced:</strong> [[ source.last_synced ? formatDate(source.last_synced) : 'Never' ]]
                     </p>
                     <p class="card-text">
                         <small class="text-muted">
@@ -224,10 +251,7 @@
             // Settings data
             settings: {
                 sync_enabled: false,
-                sync_schedule: {
-                    daily: false,
-                    times: {}
-                },
+                sync_schedules: [],
                 allow_channel_auto_deletion: true
             },
             settingsStatus: 'idle', // idle, modified, saving, saved
@@ -355,13 +379,66 @@
             fetchSettings() {
                 axios.get('/api/settings/')
                     .then(response => {
-                        this.settings = response.data;
-                        // Initialize empty arrays for days that don't have times
-                        this.daysOfWeek.forEach(day => {
-                            if (!this.settings.sync_schedule.times[day.toLowerCase()]) {
-                                this.$set(this.settings.sync_schedule.times, day.toLowerCase(), []);
-                            }
-                        });
+                        const settingsData = response.data;
+
+                        // Ensure sync_schedules is an array
+                        if (!settingsData.sync_schedules) {
+                            settingsData.sync_schedules = [];
+                        }
+
+                        // Convert schedule times from UTC (as stored on the server) to local browser time zone
+                        // This ensures that users see schedules in their own time zone
+                        if (settingsData.sync_schedules && settingsData.sync_schedules.length > 0) {
+                            settingsData.sync_schedules.forEach(schedule => {
+                                // Ensure each schedule has a daysOfWeek array
+                                if (!schedule.daysOfWeek) {
+                                    schedule.daysOfWeek = [];
+                                }
+
+                                if (schedule.time) {
+                                    // Parse the UTC time string (HH:MM:SS)
+                                    const timeParts = schedule.time.split(':');
+                                    const utcHours = parseInt(timeParts[0], 10);
+                                    const utcMinutes = parseInt(timeParts[1], 10);
+                                    const utcSeconds = timeParts.length > 2 ? parseInt(timeParts[2], 10) : 0;
+
+                                    // Create a Date object with the UTC time
+                                    const utcDate = new Date();
+                                    utcDate.setUTCHours(utcHours, utcMinutes, utcSeconds, 0);
+
+                                    // Get the local time components
+                                    const localHours = utcDate.getHours();
+                                    const localMinutes = utcDate.getMinutes();
+                                    const localSeconds = utcDate.getSeconds();
+
+                                    // Format as HH:MM:SS
+                                    schedule.time = 
+                                        String(localHours).padStart(2, '0') + ':' + 
+                                        String(localMinutes).padStart(2, '0') + ':' + 
+                                        String(localSeconds).padStart(2, '0');
+
+                                    // If the day changed due to timezone conversion, adjust the days of week
+                                    // For example, if Monday 5am UTC becomes Sunday 10pm PT, we need to shift the day from Monday to Sunday
+                                    if (utcDate.getUTCDate() !== utcDate.getDate()) {
+                                        // Determine if we crossed forward or backward
+                                        const dayDiff = (utcDate.getDay() - utcDate.getUTCDay() + 7) % 7;
+
+                                        // Shift the days of week accordingly
+                                        const shiftedDays = [];
+                                        for (const day of schedule.daysOfWeek) {
+                                            const dayIndex = this.daysOfWeek.indexOf(day);
+                                            if (dayIndex !== -1) {
+                                                const newDayIndex = (dayIndex + dayDiff) % 7;
+                                                shiftedDays.push(this.daysOfWeek[newDayIndex]);
+                                            }
+                                        }
+                                        schedule.daysOfWeek = shiftedDays;
+                                    }
+                                }
+                            });
+                        }
+
+                        this.settings = settingsData;
                         this.settingsError = null;
                     })
                     .catch(error => {
@@ -373,9 +450,109 @@
             saveSettings() {
                 this.settingsStatus = 'saving';
 
-                axios.put('/api/settings/', this.settings)
+                // Create a deep copy of the settings to avoid modifying the original
+                const settingsToSave = JSON.parse(JSON.stringify(this.settings));
+
+                // Convert schedule times from local browser time zone to UTC
+                // This ensures that schedules are stored in a consistent time zone on the server
+                if (settingsToSave.sync_schedules && settingsToSave.sync_schedules.length > 0) {
+                    settingsToSave.sync_schedules.forEach(schedule => {
+                        if (schedule.time) {
+                            // Parse the time string (HH:MM or HH:MM:SS)
+                            const timeParts = schedule.time.split(':');
+                            const hours = parseInt(timeParts[0], 10);
+                            const minutes = parseInt(timeParts[1], 10);
+                            const seconds = timeParts.length > 2 ? parseInt(timeParts[2], 10) : 0;
+
+                            // Create a Date object for today with the specified time
+                            const localDate = new Date();
+                            localDate.setHours(hours, minutes, seconds, 0);
+
+                            // Convert to UTC time
+                            const utcHours = localDate.getUTCHours();
+                            const utcMinutes = localDate.getUTCMinutes();
+                            const utcSeconds = localDate.getUTCSeconds();
+
+                            // Format as HH:MM:SS
+                            schedule.time = 
+                                String(utcHours).padStart(2, '0') + ':' + 
+                                String(utcMinutes).padStart(2, '0') + ':' + 
+                                String(utcSeconds).padStart(2, '0');
+
+                            // If the day changed due to timezone conversion, adjust the days of week
+                            // For example, if Sunday 10pm PT becomes Monday 5am UTC, we need to shift the day from Sunday to Monday
+                            if (localDate.getUTCDate() !== localDate.getDate()) {
+                                // Determine if we crossed forward or backward
+                                const dayDiff = (localDate.getUTCDay() - localDate.getDay() + 7) % 7;
+
+                                // Shift the days of week accordingly
+                                const shiftedDays = [];
+                                for (const day of schedule.daysOfWeek) {
+                                    const dayIndex = this.daysOfWeek.indexOf(day);
+                                    if (dayIndex !== -1) {
+                                        const newDayIndex = (dayIndex + dayDiff) % 7;
+                                        shiftedDays.push(this.daysOfWeek[newDayIndex]);
+                                    }
+                                }
+                                schedule.daysOfWeek = shiftedDays;
+                            }
+                        }
+                    });
+                }
+
+                axios.put('/api/settings/', settingsToSave)
                     .then(response => {
-                        this.settings = response.data;
+                        // Get the response data
+                        const responseData = response.data;
+
+                        // Convert schedule times from UTC (as stored on the server) to local browser time zone
+                        // This ensures that users see schedules in their own time zone after saving
+                        if (responseData.sync_schedules && responseData.sync_schedules.length > 0) {
+                            responseData.sync_schedules.forEach(schedule => {
+                                if (schedule.time) {
+                                    // Parse the UTC time string (HH:MM:SS)
+                                    const timeParts = schedule.time.split(':');
+                                    const utcHours = parseInt(timeParts[0], 10);
+                                    const utcMinutes = parseInt(timeParts[1], 10);
+                                    const utcSeconds = timeParts.length > 2 ? parseInt(timeParts[2], 10) : 0;
+
+                                    // Create a Date object with the UTC time
+                                    const utcDate = new Date();
+                                    utcDate.setUTCHours(utcHours, utcMinutes, utcSeconds, 0);
+
+                                    // Get the local time components
+                                    const localHours = utcDate.getHours();
+                                    const localMinutes = utcDate.getMinutes();
+                                    const localSeconds = utcDate.getSeconds();
+
+                                    // Format as HH:MM:SS
+                                    schedule.time = 
+                                        String(localHours).padStart(2, '0') + ':' + 
+                                        String(localMinutes).padStart(2, '0') + ':' + 
+                                        String(localSeconds).padStart(2, '0');
+
+                                    // If the day changed due to timezone conversion, adjust the days of week
+                                    if (utcDate.getUTCDate() !== utcDate.getDate()) {
+                                        // Determine if we crossed forward or backward
+                                        const dayDiff = (utcDate.getDay() - utcDate.getUTCDay() + 7) % 7;
+
+                                        // Shift the days of week accordingly
+                                        const shiftedDays = [];
+                                        for (const day of schedule.daysOfWeek) {
+                                            const dayIndex = this.daysOfWeek.indexOf(day);
+                                            if (dayIndex !== -1) {
+                                                const newDayIndex = (dayIndex + dayDiff) % 7;
+                                                shiftedDays.push(this.daysOfWeek[newDayIndex]);
+                                            }
+                                        }
+                                        schedule.daysOfWeek = shiftedDays;
+                                    }
+                                }
+                            });
+                        }
+
+                        // Update the settings with the converted response data
+                        this.settings = responseData;
                         this.settingsStatus = 'saved';
                         this.settingsError = null;
 
@@ -407,23 +584,56 @@
                 }, 3000);
             },
 
-            getDayTimes(day) {
-                if (!this.settings.sync_schedule.times[day]) {
-                    this.$set(this.settings.sync_schedule.times, day, []);
-                }
-                return this.settings.sync_schedule.times[day];
-            },
-
-            addTime(day) {
-                if (!this.settings.sync_schedule.times[day]) {
-                    this.$set(this.settings.sync_schedule.times, day, []);
-                }
-                this.settings.sync_schedule.times[day].push('12:00');
+            addNewSchedule() {
+                // Add a new empty schedule with default time and no days selected
+                this.settings.sync_schedules.push({
+                    daysOfWeek: [],
+                    time: '12:00'
+                });
                 this.onSettingsChange();
             },
 
-            removeTime(day, index) {
-                this.settings.sync_schedule.times[day].splice(index, 1);
+            removeSchedule(index) {
+                // Remove a schedule at the specified index
+                this.settings.sync_schedules.splice(index, 1);
+                this.onSettingsChange();
+            },
+
+            addQuickSchedule(type) {
+                let daysOfWeek = [];
+                const time = '12:00';
+
+                // Set days based on selection type
+                if (type === 'all') {
+                    daysOfWeek = [...this.daysOfWeek]; // All days
+                } else if (type === 'weekdays') {
+                    daysOfWeek = this.daysOfWeek.slice(0, 5); // Monday to Friday
+                } else if (type === 'weekend') {
+                    daysOfWeek = this.daysOfWeek.slice(5, 7); // Saturday and Sunday
+                }
+
+                // Add the new schedule
+                this.settings.sync_schedules.push({
+                    daysOfWeek,
+                    time
+                });
+
+                this.onSettingsChange();
+            },
+
+            applyQuickSchedule(scheduleIndex, type) {
+                // Get the schedule at the specified index
+                const schedule = this.settings.sync_schedules[scheduleIndex];
+
+                // Set days based on selection type
+                if (type === 'all') {
+                    schedule.daysOfWeek = [...this.daysOfWeek]; // All days
+                } else if (type === 'weekdays') {
+                    schedule.daysOfWeek = this.daysOfWeek.slice(0, 5); // Monday to Friday
+                } else if (type === 'weekend') {
+                    schedule.daysOfWeek = this.daysOfWeek.slice(5, 7); // Saturday and Sunday
+                }
+
                 this.onSettingsChange();
             }
         }

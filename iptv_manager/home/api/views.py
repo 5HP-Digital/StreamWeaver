@@ -83,10 +83,7 @@ class SettingsView(APIView):
             # Default settings
             settings_data = {
                 "sync_enabled": False,
-                "sync_schedule": {
-                    "daily": False,
-                    "times": {}
-                },
+                "sync_schedules": [],
                 "allow_channel_auto_deletion": True
             }
             # Save default settings to config store

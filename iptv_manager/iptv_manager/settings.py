@@ -19,6 +19,9 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
+# Config Store
+CONFIG_PATH = os.environ.get('CONFIG_PATH', './config')
+
 ALLOWED_HOSTS = ['*']
 
 # Application definition
@@ -70,9 +73,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'iptv_manager.wsgi.application'
 ASGI_APPLICATION = 'iptv_manager.asgi.application'
-
-# Config Store
-CONFIG_PATH = os.environ.get('CONFIG_PATH', './config')
 
 # Database
 DATABASES = {
