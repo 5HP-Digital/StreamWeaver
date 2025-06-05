@@ -20,7 +20,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key')
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Config Store
-CONFIG_PATH = os.environ.get('CONFIG_PATH', './config')
+CONFIG_DIR = os.environ.get('CONFIG_DIR', './config')
 
 ALLOWED_HOSTS = ['*']
 
@@ -78,7 +78,7 @@ ASGI_APPLICATION = 'iptv_manager.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(CONFIG_PATH, 'db.sqlite3'),
+        'NAME': os.path.join(CONFIG_DIR, 'db.sqlite3'),
     }
 }
 

@@ -12,7 +12,7 @@ class ConfigStore:
     A file-based key-value store for persisting settings and configuration in JSON format.
     
     This class provides methods to read, write, and update configuration data stored in JSON files.
-    The storage location is determined by the CONFIG_PATH environment variable.
+    The storage location is determined by the CONFIG_DIR environment variable.
     """
     
     def __init__(self, namespace=None):
@@ -36,8 +36,8 @@ class ConfigStore:
         Returns:
             Path: The path to the configuration directory.
         """
-        # Get the CONFIG_PATH from environment variables
-        config_path = settings.CONFIG_PATH
+        # Get the CONFIG_DIR from environment variables
+        config_path = settings.CONFIG_DIR
 
         # Create a Path object
         config_dir = Path(config_path)
