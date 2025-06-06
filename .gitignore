@@ -48,3 +48,6 @@ Thumbs.db
 
 # Config
 iptv_manager/config/
+
+# Static files
+iptv_manager/staticfiles/

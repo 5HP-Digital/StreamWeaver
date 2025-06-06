@@ -142,6 +142,17 @@ docker-compose exec web python manage.py migrate
 python manage.py migrate
 ```
 
+### Collecting Static Files
+
+Django needs to collect all static files from various applications into a single location for production deployment. This is handled by the `collectstatic` command.
+
+```
+# Make sure you're in the iptv_manager directory with your virtual environment activated
+python manage.py collectstatic --noinput
+```
+
+Note: The `--noinput` flag prevents Django from asking for confirmation. The collected static files are stored in the `staticfiles` directory, which is excluded from version control.
+
 ### Creating a Superuser
 
 #### With Docker
