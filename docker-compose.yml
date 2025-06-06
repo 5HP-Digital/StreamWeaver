@@ -3,8 +3,17 @@
   web:
     build:
       context: ./iptv_manager
+      dockerfile: web.Dockerfile
     restart: always
     ports:
       - "8000:8000"
+    volumes:
+      - ./iptv_manager/config:/config
+
+  task-worker:
+    build:
+      context: ./iptv_manager
+      dockerfile: task-worker.Dockerfile
+    restart: always
     volumes:
       - ./iptv_manager/config:/config
