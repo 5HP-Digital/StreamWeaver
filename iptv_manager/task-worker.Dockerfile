@@ -27,9 +27,10 @@ FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV CONFIG_DIR=/config
+ENV USER=app
 
 # Create app user for security
-RUN groupadd -r app && useradd -r -g app app
+RUN groupadd -r app && useradd -r -M -g app ${USER}
 
 # Set work directory
 WORKDIR /app
@@ -50,21 +51,27 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.t
     rm -rf /wheels
 
 # Set proper permissions
-RUN chown -R app:app /app && \
-    mkdir -p /config && \
-    chown -R app:app /config
+RUN chown -R ${USER}:app /app && \
+    mkdir -p ${CONFIG_DIR} && \
+    chown -R ${USER}:app ${CONFIG_DIR}
 
-# Stage 3: Worker image
+# Stage 3: Web app image
 FROM runtime AS final
 
-WORKDIR /app
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV CONFIG_DIR=/config
+ENV USER=app
 
-# Switch to non-root user
-USER app
+WORKDIR /app
 
 # Healthcheck
 #HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=10s \
 #  CMD curl -f http://localhost:8000/api/health/ || exit 1
+
+# Switch to non-root user
+USER ${USER}
 
 # Run the application
 CMD ["python", "manage.py", "qcluster"]

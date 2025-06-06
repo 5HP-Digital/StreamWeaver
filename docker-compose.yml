@@ -9,6 +9,8 @@
       - "8000:8000"
     volumes:
       - ./iptv_manager/config:/config
+    depends_on:
+      - migration
 
   task-worker:
     build:
@@ -17,3 +19,13 @@
     restart: always
     volumes:
       - ./iptv_manager/config:/config
+    depends_on:
+      - migration
+
+  migration:
+    build:
+      context: ./iptv_manager
+      dockerfile: task-worker.Dockerfile
+    volumes:
+      - ./iptv_manager/config:/config
+    command: python manage.py migrate

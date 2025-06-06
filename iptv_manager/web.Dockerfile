@@ -27,9 +27,10 @@ FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV CONFIG_DIR=/config
+ENV USER=app
 
 # Create app user for security
-RUN groupadd -r app && useradd -r -g app app
+RUN groupadd -r app && useradd -r -M -g app ${USER}
 
 # Set work directory
 WORKDIR /app
@@ -50,20 +51,23 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.t
     rm -rf /wheels
 
 # Set proper permissions
-RUN chown -R app:app /app && \
-    mkdir -p /config && \
-    chown -R app:app /config
+RUN chown -R ${USER}:app /app && \
+    mkdir -p ${CONFIG_DIR} && \
+    chown -R ${USER}:app ${CONFIG_DIR}
 
 # Stage 3: Web app image
 FROM runtime AS final
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV CONFIG_DIR=/config
+ENV USER=app
 
 WORKDIR /app
 
 # Collect static files
 RUN python manage.py collectstatic --noinput
-
-# Switch to non-root user
-USER app
 
 # Expose port
 EXPOSE 8000
@@ -71,6 +75,9 @@ EXPOSE 8000
 # Healthcheck
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=10s \
   CMD curl -f http://localhost:8000/api/health/ || exit 1
+
+# Switch to non-root user
+USER ${USER}
 
 # Run the application
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "iptv_manager.asgi:application"]
