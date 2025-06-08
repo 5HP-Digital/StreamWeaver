@@ -23,7 +23,7 @@ var/
 # Django
 *.log
 local_settings.py
-iptv_manager/config/db.sqlite3
+db.sqlite3
 db.sqlite3-journal
 media
 
@@ -47,7 +47,7 @@ ENV/
 Thumbs.db
 
 # Config
-iptv_manager/config/
+config/
 
 # Static files
 iptv_manager/staticfiles/

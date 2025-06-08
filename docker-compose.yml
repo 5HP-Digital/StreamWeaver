@@ -7,18 +7,22 @@
     restart: always
     ports:
       - "8000:8000"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
     volumes:
-      - ./iptv_manager/config:/config
+      - ./config:/config
     depends_on:
       - migration
 
-  task-worker:
+  job-worker:
     build:
-      context: ./iptv_manager
-      dockerfile: task-worker.Dockerfile
+      context: ./IPTV.JobWorker
+      dockerfile: Dockerfile
     restart: always
+    environment:
+      - RABBITMQ_HOST=rabbitmq
     volumes:
-      - ./iptv_manager/config:/config
+      - ./config:/config
     depends_on:
       - migration
 
@@ -27,5 +31,19 @@
       context: ./iptv_manager
       dockerfile: task-worker.Dockerfile
     volumes:
-      - ./iptv_manager/config:/config
+      - ./config:/config
     command: python manage.py migrate
+    healthcheck:
+      test: ["None"]
+      disable: true
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+
+volumes:
+  rabbitmq_data:
