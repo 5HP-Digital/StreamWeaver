@@ -9,7 +9,7 @@ using TimeProvider = Digital5HP.TimeProvider;
 
 namespace IPTV.JobWorker;
 
-public class JobQueueWorker(ILogger<JobQueueWorker> logger, IServiceProvider serviceProvider, ConnectionFactory connectionFactory) : BackgroundService
+public class JobQueueWorker(ILogger<JobQueueWorker> logger, IServiceProvider serviceProvider, IConnectionFactory connectionFactory) : BackgroundService
 {
     private IConnection? _connection;
     private IChannel? _channel;

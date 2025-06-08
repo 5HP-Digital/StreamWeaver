@@ -34,12 +34,13 @@
       - ./config:/config
     command: python manage.py migrate
     healthcheck:
-      test: ["None"]
+      test: ["NONE"]
       disable: true
 
   rabbitmq:
     image: rabbitmq:4-management
     ports:
+      - "5672:5672"
       - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq

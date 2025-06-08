@@ -161,6 +161,9 @@
                         <button class="btn btn-sm btn-danger" @click="confirmDelete(source)">
                             <i class="bi bi-trash"></i> Delete
                         </button>
+                        <button class="btn btn-sm btn-success" @click="syncSource(source)" :disabled="source.syncInProgress || !source.is_enabled">
+                            <i class="bi" :class="source.syncInProgress ? 'bi-hourglass-split' : 'bi-arrow-repeat'"></i> Sync Now
+                        </button>
                     </div>
                 </div>
             </div>
@@ -225,6 +228,55 @@
             </div>
         </div>
     </div>
+
+    <!-- Sync Progress Modal -->
+    <div class="modal fade" id="syncModal" tabindex="-1" aria-labelledby="syncModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="syncModalLabel">Synchronizing "[[ currentSource.name ]]"</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="syncStatus === 'queued'" class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Sync job has been queued and will start shortly...</p>
+                    </div>
+
+                    <div v-if="syncStatus === 'in_progress'" class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Synchronization in progress...</p>
+                        <p>Elapsed time: [[ syncElapsedTime ]]</p>
+                    </div>
+
+                    <div v-if="syncStatus === 'completed' && syncSuccess" class="text-center">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                        <p class="mt-3">Synchronization completed successfully!</p>
+                        <p>Total time: [[ syncElapsedTime ]]</p>
+                    </div>
+
+                    <div v-if="syncStatus === 'completed' && !syncSuccess" class="text-center">
+                        <i class="bi bi-x-circle-fill text-danger" style="font-size: 3rem;"></i>
+                        <p class="mt-3">Synchronization failed.</p>
+                        <p>Total time: [[ syncElapsedTime ]]</p>
+                    </div>
+
+                    <div v-if="syncStatus === 'error'" class="text-center">
+                        <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 3rem;"></i>
+                        <p class="mt-3">An error occurred while checking sync status.</p>
+                        <p class="text-danger">[[ syncErrorMessage ]]</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -248,6 +300,15 @@
             formSubmitting: false,
             sourceModal: null,
             deleteModal: null,
+            syncModal: null,
+            // Sync data
+            syncStatus: null, // queued, in_progress, completed, error
+            syncSuccess: false,
+            syncJobId: null,
+            syncStartTime: null,
+            syncElapsedTime: '00:00:00',
+            syncTimer: null,
+            syncErrorMessage: null,
             // Settings data
             settings: {
                 sync_enabled: false,
@@ -264,6 +325,14 @@
             this.fetchSettings();
             this.sourceModal = new bootstrap.Modal(document.getElementById('sourceModal'));
             this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            this.syncModal = new bootstrap.Modal(document.getElementById('syncModal'));
+
+            // Add event listener for sync modal close
+            document.getElementById('syncModal').addEventListener('hidden.bs.modal', () => {
+                // Don't reset sync state when modal is closed
+                // This allows the sync to continue in the background
+                console.log('Sync modal closed, job continues in background');
+            });
         },
         methods: {
             fetchSources() {
@@ -272,7 +341,12 @@
 
                 axios.get('/api/sources/')
                     .then(response => {
-                        this.sources = response.data;
+                        // Initialize syncInProgress property for each source
+                        const sources = response.data.map(source => ({
+                            ...source,
+                            syncInProgress: false
+                        }));
+                        this.sources = sources;
                         this.loading = false;
                     })
                     .catch(error => {
@@ -280,6 +354,140 @@
                         this.error = 'Failed to load playlist sources. Please try again later.';
                         this.loading = false;
                     });
+            },
+
+            syncSource(source) {
+                // Reset sync state
+                this.resetSyncState();
+
+                // Set current source
+                this.currentSource = {
+                    id: source.id,
+                    name: source.name,
+                    url: source.url
+                };
+
+                // Show sync modal
+                this.syncModal.show();
+
+                // Start sync
+                axios.post(`/api/sources/${source.id}/sync/`)
+                    .then(response => {
+                        console.log('Sync initiated:', response.data);
+
+                        // Update sync status
+                        this.syncStatus = response.data.status;
+                        this.syncJobId = response.data.job_id;
+                        this.syncStartTime = new Date();
+
+                        // Mark source as syncing
+                        const sourceIndex = this.sources.findIndex(s => s.id === source.id);
+                        if (sourceIndex !== -1) {
+                            this.sources[sourceIndex].syncInProgress = true;
+                        }
+
+                        // Start timer to update elapsed time
+                        this.startSyncTimer();
+
+                        // Start polling for sync status
+                        this.checkSyncStatus();
+                    })
+                    .catch(error => {
+                        console.error('Error initiating sync:', error);
+                        this.syncStatus = 'error';
+                        this.syncErrorMessage = error.response?.data?.error || 'Failed to initiate sync. Please try again.';
+                    });
+            },
+
+            checkSyncStatus() {
+                if (!this.syncJobId || this.syncStatus === 'completed' || this.syncStatus === 'error') {
+                    return;
+                }
+
+                axios.get(`/api/sources/${this.currentSource.id}/sync_status/`, {
+                    params: { job_id: this.syncJobId }
+                })
+                    .then(response => {
+                        console.log('Sync status:', response.data);
+
+                        // Update sync status
+                        this.syncStatus = response.data.status;
+
+                        if (response.data.status === 'completed') {
+                            // Sync completed
+                            this.syncSuccess = response.data.success;
+
+                            // Stop timer
+                            this.stopSyncTimer();
+
+                            // Mark source as not syncing
+                            const sourceIndex = this.sources.findIndex(s => s.id === this.currentSource.id);
+                            if (sourceIndex !== -1) {
+                                this.sources[sourceIndex].syncInProgress = false;
+                            }
+
+                            // Refresh sources to get updated data
+                            this.fetchSources();
+                        } else if (response.data.status === 'in_progress' || response.data.status === 'queued') {
+                            // Continue polling
+                            setTimeout(() => this.checkSyncStatus(), 2000);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking sync status:', error);
+                        this.syncStatus = 'error';
+                        this.syncErrorMessage = error.response?.data?.error || 'Failed to check sync status.';
+
+                        // Mark source as not syncing
+                        const sourceIndex = this.sources.findIndex(s => s.id === this.currentSource.id);
+                        if (sourceIndex !== -1) {
+                            this.sources[sourceIndex].syncInProgress = false;
+                        }
+
+                        // Stop timer
+                        this.stopSyncTimer();
+                    });
+            },
+
+            startSyncTimer() {
+                // Clear any existing timer
+                this.stopSyncTimer();
+
+                // Start a new timer that updates every second
+                this.syncTimer = setInterval(() => this.updateElapsedTime(), 1000);
+            },
+
+            stopSyncTimer() {
+                if (this.syncTimer) {
+                    clearInterval(this.syncTimer);
+                    this.syncTimer = null;
+                }
+            },
+
+            updateElapsedTime() {
+                if (!this.syncStartTime) return;
+
+                const now = new Date();
+                const elapsed = Math.floor((now - this.syncStartTime) / 1000); // in seconds
+
+                const hours = Math.floor(elapsed / 3600);
+                const minutes = Math.floor((elapsed % 3600) / 60);
+                const seconds = elapsed % 60;
+
+                this.syncElapsedTime = 
+                    String(hours).padStart(2, '0') + ':' + 
+                    String(minutes).padStart(2, '0') + ':' + 
+                    String(seconds).padStart(2, '0');
+            },
+
+            resetSyncState() {
+                this.syncStatus = null;
+                this.syncSuccess = false;
+                this.syncJobId = null;
+                this.syncStartTime = null;
+                this.syncElapsedTime = '00:00:00';
+                this.syncErrorMessage = null;
+                this.stopSyncTimer();
             },
             showAddModal() {
                 this.editMode = false;

@@ -1,5 +1,5 @@
 ﻿from rest_framework import serializers
-from .models import PlaylistSource, PlaylistSourceChannel, PlaylistSourceInvocation
+from .models import PlaylistSource, PlaylistSourceChannel, JobState
 
 
 class PlaylistSourceSerializer(serializers.ModelSerializer):
@@ -22,11 +22,11 @@ class PlaylistSourceSerializer(serializers.ModelSerializer):
 
     def get_last_synced(self, obj):
         """
-        Get the date of the last successful invocation.
+        Get the date of the last successful job.
         """
-        last_invocation = obj.invocations.filter(completed=True, error__isnull=True).order_by('-updated_at').first()
-        if last_invocation:
-            return last_invocation.created_at
+        last_job = obj.jobs.filter(state=JobState.COMPLETED).order_by('-updated_at').first()
+        if last_job:
+            return last_job.updated_at
         return None
 
 

@@ -35,7 +35,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third-party apps
     'rest_framework',
-    'django_q',
     #'corsheaders',
     'channels',
     # Local apps
@@ -135,13 +134,9 @@ CHANNEL_LAYERS = {
     },
 }
 
-# Django Q2
-Q_CLUSTER = {
-    'name': 'DjangORM',
-    'workers': 4,
-    'timeout': 90,
-    'retry': 120,
-    'queue_limit': 50,
-    'bulk': 10,
-    'orm': 'default'
-}
+# RabbitMQ configuration
+RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'localhost')
+RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
+RABBITMQ_USER = os.environ.get('RABBITMQ_USER', 'guest')
+RABBITMQ_PWD = os.environ.get('RABBITMQ_PWD', 'guest')
+RABBITMQ_QUEUE_JOBS = 'jobs_queue'

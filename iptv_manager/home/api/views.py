@@ -1,5 +1,4 @@
 ﻿import datetime
-import json
 import psutil
 from django.db import connection
 from django.db.utils import OperationalError
@@ -7,7 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import ServerTimeSerializer, ResourceUtilizationSerializer, SettingsSerializer
-from iptv_manager.config_store import ConfigStore
+from iptv_manager.utils import ConfigStore
 
 
 class ServerTimeView(APIView):

@@ -3,21 +3,171 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from math import ceil
+import json
+from django.conf import settings
 
-from .models import PlaylistSource, PlaylistSourceChannel
+from .models import PlaylistSource, PlaylistSourceChannel, Job, JobState
+from .rabbitmq import publish_message
 from .serializers import (
     PlaylistSourceSerializer,
     PlaylistSourceCreateSerializer,
     PlaylistSourceUpdateSerializer,
     PlaylistSourceChannelSerializer
 )
-
+from iptv_manager.utils import ConfigStore
 
 class SourcesViewSet(viewsets.ViewSet):
     """
     API endpoint for playlist sources.
     Based on IPTV.PlaylistManager/Controllers/SourcesControllers.cs
     """
+
+    @action(detail=True, methods=['post'])
+    def sync(self, request, pk=None):
+        """
+        Manually trigger a playlist source synchronization.
+
+        Returns:
+            Response: A response containing the job ID and initial status.
+        """
+        source = get_object_or_404(PlaylistSource, pk=pk)
+
+        # Check if source is enabled
+        if not source.is_enabled:
+            return Response(
+                {"error": "Cannot sync disabled playlist source"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if there's already a sync job in progress or pending for this source
+        active_jobs = source.jobs.filter(state__in=[JobState.PENDING, JobState.IN_PROGRESS])
+
+        if active_jobs.exists():
+            job = active_jobs.first()
+            return Response({
+                "job_id": str(job.job_id),
+                "status": job.state,
+                "message": f"Sync already {job.state.lower()} for this source"
+            })
+
+        # Retrieve iptv settings
+        config_store = ConfigStore()
+        settings_data = config_store.get("iptv:settings")
+
+        # Create the job
+        job = Job.objects.create(
+            state=JobState.PENDING,
+            context="{}"  # Temporary, will be updated after job creation
+        )
+
+        # Associate the job with the source
+        source.jobs.add(job)
+
+        # Create a new Job for the current source with default values
+        job_context = {
+            "jobId": job.job_id,
+            "type": "PlaylistSync",
+            "options": {
+                "sourceId": source.id,
+                "allowChannelAutoDeletion": settings_data.get("allow_channel_auto_deletion", True),
+            }
+        }
+
+        # Update the job context
+        job.context = json.dumps(job_context)
+        job.save()
+
+        # Publish the message to RabbitMQ
+        publish_success = publish_message(
+            settings.RABBITMQ_QUEUE_JOBS,
+            job_context
+        )
+
+        if not publish_success:
+            # If publishing fails, mark the job as failed
+            job.state = JobState.FAILED
+            job.error = "Failed to publish message to RabbitMQ"
+            job.save()
+
+            return Response({
+                "job_id": str(job.job_id),
+                "status": "failed",
+                "message": "Failed to queue sync job"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            "job_id": str(job.job_id),
+            "status": "queued",
+            "message": "Sync job queued successfully"
+        })
+
+    @action(detail=True, methods=['get'])
+    def sync_status(self, request, pk=None):
+        """
+        Get the status of a sync job for a playlist source.
+
+        Query Parameters:
+            job_id: The UUID of the job to check.
+
+        Returns:
+            Response: A response containing the job status.
+        """
+        job_id = request.query_params.get('job_id')
+        if not job_id:
+            return Response(
+                {"error": "job_id query parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Get the job by UUID
+            job = Job.objects.get(job_id=job_id)
+
+            # Check the job state
+            if job.state == JobState.PENDING:
+                return Response({
+                    "job_id": str(job.job_id),
+                    "status": "pending",
+                    "message": "Sync job is pending"
+                })
+            elif job.state == JobState.IN_PROGRESS:
+                return Response({
+                    "job_id": str(job.job_id),
+                    "status": "in_progress",
+                    "message": "Sync job is in progress"
+                })
+            elif job.state == JobState.COMPLETED:
+                return Response({
+                    "job_id": str(job.job_id),
+                    "status": "completed",
+                    "success": True,
+                    "message": "Sync completed successfully"
+                })
+            elif job.state == JobState.FAILED:
+                return Response({
+                    "job_id": str(job.job_id),
+                    "status": "completed",
+                    "success": False,
+                    "message": f"Sync failed: {job.error or 'Unknown error'}"
+                })
+            else:
+                return Response({
+                    "job_id": str(job.job_id),
+                    "status": "unknown",
+                    "message": f"Unknown job state: {job.state}"
+                })
+        except Job.DoesNotExist:
+            return Response({
+                "job_id": job_id,
+                "status": "error",
+                "message": "Job not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                "job_id": job_id,
+                "status": "error",
+                "message": f"Error checking job status: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def list(self, request):
         """
@@ -31,7 +181,7 @@ class SourcesViewSet(viewsets.ViewSet):
         """
         Get a specific playlist source by ID.
         """
-        source = get_object_or_404(PlaylistSource.objects.prefetch_related('invocations'), pk=pk)
+        source = get_object_or_404(PlaylistSource.objects.prefetch_related('jobs'), pk=pk)
         serializer = PlaylistSourceSerializer(source)
         return Response(serializer.data)
 
