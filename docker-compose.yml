@@ -21,6 +21,7 @@
     restart: always
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - DOTNET_ENVIRONMENT=Development
     volumes:
       - ./config:/config
     depends_on:

@@ -28,7 +28,7 @@ db.sqlite3-journal
 media
 
 # Virtual Environment
-iptv_manager/.env
+.env
 .venv
 venv/
 ENV/

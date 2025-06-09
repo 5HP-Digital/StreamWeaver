@@ -1,6 +1,6 @@
 ﻿namespace IPTV.JobWorker.Data;
 
-public class Job
+public class Job : ITimestampable
 {
     public long Id { get; set; }
 

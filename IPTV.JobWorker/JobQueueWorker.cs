@@ -47,7 +47,7 @@ public class JobQueueWorker(ILogger<JobQueueWorker> logger, IServiceProvider ser
                 
                 logger.LogInformation("Received message: {message}", message);
                 
-                var jobContext = JsonSerializer.Deserialize<JobContext>(message);
+                var jobContext = JsonSerializer.Deserialize<JobContext>(message, JsonSerializerOptions.Web);
                 
                 if (jobContext == null)
                 {
@@ -95,9 +95,13 @@ public class JobQueueWorker(ILogger<JobQueueWorker> logger, IServiceProvider ser
         logger.LogInformation("Processing job of type {JobType} with ID {JobId}", 
             jobContext.Type, jobContext.JobId);
         
-        await using var workerContext = serviceProvider.GetRequiredService<WorkerContext>();
+        using var scope = serviceProvider.CreateScope();
         
-        var job = await workerContext.Jobs.SingleOrDefaultAsync(j => j.JobId == jobContext.JobId, cancellationToken: cancellationToken);
+        await using var workerContext = scope.ServiceProvider.GetRequiredService<WorkerContext>();
+        
+        var job = await workerContext.Jobs.SingleOrDefaultAsync(
+            j => j.JobId.ToString() == jobContext.JobId.ToString("N"), 
+            cancellationToken: cancellationToken);
         if (job == null)
         {
             logger.LogError("Job with ID {JobId} was not found", jobContext.JobId);
@@ -119,7 +123,7 @@ public class JobQueueWorker(ILogger<JobQueueWorker> logger, IServiceProvider ser
             switch (jobContext.Type)
             {
                 case JobType.PlaylistSync:
-                    await RunJob<PlaylistSynchronizer, PlaylistSynchronizerOptions>(message, cancellationToken);
+                    await RunJob<PlaylistSynchronizer, PlaylistSynchronizerOptions>(scope, message, cancellationToken);
                     break;
 
                 default:
@@ -156,18 +160,16 @@ public class JobQueueWorker(ILogger<JobQueueWorker> logger, IServiceProvider ser
         }
     }
 
-    private async Task RunJob<T, TOption>(string message, CancellationToken cancellationToken)
+    private async Task RunJob<T, TOption>(IServiceScope scope, string message, CancellationToken cancellationToken)
         where T : IJobRunner<TOption>
     {
-        var jc = JsonSerializer.Deserialize<JobContext<TOption>>(message);
+        var jc = JsonSerializer.Deserialize<JobContext<TOption>>(message, JsonSerializerOptions.Web);
         if (jc == null)
         {
             logger.LogError("Failed to deserialize job options");
             return;
         }
 
-        using var scope = serviceProvider.CreateScope();
-        
         var runner = scope.ServiceProvider.GetRequiredService<T>();
         await runner.Run(jc.Options, cancellationToken);
     }

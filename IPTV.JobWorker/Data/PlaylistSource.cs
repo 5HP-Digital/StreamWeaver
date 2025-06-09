@@ -1,6 +1,6 @@
 ﻿namespace IPTV.JobWorker.Data;
 
-public class PlaylistSource
+public class PlaylistSource : ITimestampable
 {
     public long Id { get; set; }
     public string Name { get; set; }
@@ -8,5 +8,6 @@ public class PlaylistSource
     public bool IsEnabled { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    public ICollection<PlaylistSourceChannel> Channels { get; init; } = [];
+    public virtual ICollection<PlaylistSourceChannel> Channels { get; init; } = [];
+    public virtual ICollection<Job> Jobs { get; init; } = [];
 }

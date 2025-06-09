@@ -61,6 +61,11 @@ public class PlaylistSynchronizer(
             if (string.IsNullOrWhiteSpace(channel.Title) || string.IsNullOrWhiteSpace(channel.MediaUrl))
                 continue;
             
+            // Skip duplicate channels
+            // Currently, we don't support multiple channels with the same title and group
+            if (processedChannels.Contains(key))
+                continue;
+            
             // Check if the channel already exists
             if (existingChannels.Contains(key))
             {
