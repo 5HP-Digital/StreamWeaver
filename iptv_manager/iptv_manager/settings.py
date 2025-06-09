@@ -20,7 +20,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key')
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Config Store
-CONFIG_DIR = os.environ.get('CONFIG_DIR', './config')
+CONFIG_DIR = os.environ.get('CONFIG_DIR', '../config')
 
 ALLOWED_HOSTS = ['*']
 
@@ -133,10 +133,3 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
     },
 }
-
-# RabbitMQ configuration
-RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'localhost')
-RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
-RABBITMQ_USER = os.environ.get('RABBITMQ_USER', 'guest')
-RABBITMQ_PWD = os.environ.get('RABBITMQ_PWD', 'guest')
-RABBITMQ_QUEUE_JOBS = 'jobs_queue'

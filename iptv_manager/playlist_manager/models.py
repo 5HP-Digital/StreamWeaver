@@ -8,31 +8,10 @@ class JobState(models.TextChoices):
     Enum representing the state of a job.
     Based on IPTV.JobWorker/Data/JobState.cs
     """
-    PENDING = 'Pending'
+    QUEUED = 'Queued'
     IN_PROGRESS = 'InProgress'
     COMPLETED = 'Completed'
     FAILED = 'Failed'
-
-
-class Job(models.Model):
-    """
-    Model representing a job.
-    Based on IPTV.JobWorker/Data/Job.cs
-    """
-    job_id = models.UUIDField(default=uuid.uuid4, unique=True)
-    state = models.CharField(
-        max_length=20,
-        choices=JobState.choices,
-        default=JobState.PENDING
-    )
-    attempt_count = models.IntegerField(default=0)
-    error = models.TextField(null=True, blank=True)
-    context = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"Job {self.job_id} - {self.state}"
 
 
 class PlaylistSource(models.Model):
@@ -43,16 +22,39 @@ class PlaylistSource(models.Model):
     name = models.CharField(max_length=255)
     url = models.TextField(validators=[URLValidator()])
     is_enabled = models.BooleanField(default=False)
-    jobs = models.ManyToManyField(
-        'Job',
-        through='PlaylistSourceJobs',
-        related_name='sources'
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
+
+
+class PlaylistSyncJob(models.Model):
+    """
+    Model representing a job.
+    Based on IPTV.JobWorker/Data/Job.cs
+    """
+    job_id = models.UUIDField(default=uuid.uuid4, unique=True)
+    state = models.CharField(
+        max_length=20,
+        choices=JobState.choices,
+        default=JobState.QUEUED
+    )
+    status_description = models.TextField(null=True, blank=True)
+    last_attempt_started_at = models.DateTimeField(null=True, blank=True)
+    attempt_count = models.IntegerField(default=0)
+    max_attempts = models.IntegerField(null=True, blank=True)
+    allow_channel_auto_deletion = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    source = models.ForeignKey(
+        PlaylistSource,
+        on_delete=models.CASCADE,
+        related_name='jobs'
+    )
+
+    def __str__(self):
+        return f"PlaylistSyncJob {self.job_id} - {self.state}"
 
 
 class PlaylistSourceChannel(models.Model):
@@ -76,24 +78,3 @@ class PlaylistSourceChannel(models.Model):
 
     def __str__(self):
         return self.title
-
-
-class PlaylistSourceJobs(models.Model):
-    """
-    Intermediate model for the many-to-many relationship between PlaylistSource and Job.
-    """
-    source = models.ForeignKey(
-        PlaylistSource, 
-        on_delete=models.CASCADE,
-        related_name='source_jobs'
-    )
-    job = models.ForeignKey(
-        Job, 
-        on_delete=models.CASCADE,
-        related_name='job_sources'
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'playlist_manager_playlistsource_jobs'
-        unique_together = ('source', 'job')
