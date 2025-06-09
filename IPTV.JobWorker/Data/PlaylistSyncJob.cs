@@ -18,8 +18,6 @@ public class PlaylistSyncJob : ITimestampable
 
     public bool AllowChannelAutoDeletion { get; set; } = true;
 
-    public required string Context { get; set; }
-
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }

@@ -60,10 +60,6 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
                 .IsRequired()
                 .HasDefaultValue(true);
 
-            builder.Property(e => e.Context)
-                .HasColumnType("text")
-                .IsRequired();
-
             builder.Property(e => e.CreatedAt)
                 .ValueGeneratedOnAdd()
                 .IsRequired();

@@ -54,6 +54,8 @@ public class PlaylistSyncJobQueueWorker(
                     logger.LogInformation("Processing job with ID {JobId} (attempt {AttemptCount} of {MaxAttempts})",
                         job.JobId, job.AttemptCount, job.MaxAttempts);
 
+                    var start = timeProvider.GetTimestamp();
+                    
                     var playlistSynchronizer = scope.ServiceProvider.GetRequiredService<PlaylistSynchronizer>();
                     var (success, description) = await playlistSynchronizer.Run(job.Source, job.AllowChannelAutoDeletion, cancellationToken: stoppingToken);
 
@@ -61,8 +63,10 @@ public class PlaylistSyncJobQueueWorker(
                     job.State = success ? JobState.Completed : JobState.Failed;
                     job.StatusDescription = description;
                     await workerContext.SaveChangesAsync(cancellationToken: stoppingToken);
+
+                    var elapsed = timeProvider.GetElapsedTime(start);
                     
-                    logger.LogInformation("Job with ID {JobId} processed", job.JobId);
+                    logger.LogInformation("Job with ID {JobId} processed in {Elapsed}", job.JobId, elapsed.ToString("G"));
                 }
                 catch (Exception ex)
                 {
