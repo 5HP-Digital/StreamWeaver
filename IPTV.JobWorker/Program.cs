@@ -18,7 +18,7 @@ builder.Services.AddSingleton<IConnectionFactory>(sp => new ConnectionFactory
 });
 
 builder.Services.AddScoped<PlaylistSynchronizer>();
-builder.Services.AddHostedService<JobQueueWorker>();
+builder.Services.AddHostedService<PlaylistSyncJobQueueWorker>();
 
 builder.Services.AddHttpClient(nameof(PlaylistSynchronizer),
     client =>

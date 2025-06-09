@@ -1,14 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using TimeProvider = Digital5HP.TimeProvider;
 
 namespace IPTV.JobWorker.Data;
 
-public class WorkerContext(IConfiguration config) : DbContext
+public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, TimeProvider timeProvider) : DbContext
 {
-    public DbSet<Job> Jobs { get; set; }
-
-    public DbSet<PlaylistSource> PlaylistSources { get; set; }
+    public DbSet<PlaylistSyncJob> Jobs { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -18,7 +15,8 @@ public class WorkerContext(IConfiguration config) : DbContext
             .UseSnakeCaseNamingConvention()
             .UseLazyLoadingProxies()
             .EnableSensitiveDataLogging()
-            .EnableDetailedErrors();
+            .EnableDetailedErrors()
+            .UseLoggerFactory(loggerFactory);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -26,10 +24,10 @@ public class WorkerContext(IConfiguration config) : DbContext
         base.OnModelCreating(modelBuilder);
 
         // Job
-        modelBuilder.Entity<Job>(builder =>
+        modelBuilder.Entity<PlaylistSyncJob>(builder =>
         {
             // Table
-            builder.ToTable("playlist_manager_job");
+            builder.ToTable("playlist_manager_playlistsyncjob");
             builder.HasKey(e => e.Id);
 
             // Properties
@@ -44,14 +42,23 @@ public class WorkerContext(IConfiguration config) : DbContext
             builder.Property(e => e.State)
                 .HasColumnType("varchar(20)")
                 .IsRequired()
+                .HasDefaultValueSql("Queued")
                 .HasConversion<EnumToStringConverter<JobState>>();
+
+            builder.Property(e => e.StatusDescription)
+                .HasColumnType("text");
 
             builder.Property(e => e.AttemptCount)
                 .IsRequired()
                 .HasDefaultValue(0);
 
-            builder.Property(e => e.Error)
-                .HasColumnType("text");
+            builder.Property(e => e.LastAttemptStartedAt);
+
+            builder.Property(e => e.MaxAttempts);
+            
+            builder.Property(e => e.AllowChannelAutoDeletion)
+                .IsRequired()
+                .HasDefaultValue(true);
 
             builder.Property(e => e.Context)
                 .HasColumnType("text")
@@ -65,8 +72,15 @@ public class WorkerContext(IConfiguration config) : DbContext
                 .ValueGeneratedOnAdd()
                 .IsRequired();
 
+            // Relationships
+            builder.HasOne(e => e.Source)
+                .WithMany(e => e.Jobs)
+                .IsRequired()
+                .HasForeignKey("source_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            
             // Indexes
-            builder.HasIndex(nameof(Job.JobId))
+            builder.HasIndex(nameof(PlaylistSyncJob.JobId))
                 .IsUnique();
         });
 
@@ -100,37 +114,9 @@ public class WorkerContext(IConfiguration config) : DbContext
                 .HasForeignKey("source_id")
                 .OnDelete(DeleteBehavior.Cascade);
             builder.HasMany(e => e.Jobs)
-                .WithMany()
-                .UsingEntity(
-                    "playlist_manager_playlistsource_jobs",
-                    e => e.HasOne(typeof(Job))
-                        .WithMany()
-                        .HasForeignKey("JobId")
-                        .HasPrincipalKey(nameof(Job.Id)),
-                    e => e.HasOne(typeof(PlaylistSource))
-                        .WithMany()
-                        .HasForeignKey("SourceId")
-                        .HasPrincipalKey(nameof(PlaylistSource.Id)),
-                    j =>
-                    {
-                        j.Property<long>("Id")
-                            .HasColumnName("id")
-                            .ValueGeneratedOnAdd();
-                        j.Property<DateTime>("CreatedAt")
-                            .HasColumnName("created_at")
-                            .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                            .ValueGeneratedOnAdd();
-                        j.Property<long>("JobId")
-                            .HasColumnName("job_id")
-                            .IsRequired();
-                        j.Property<long>("SourceId")
-                            .HasColumnName("source_id")
-                            .IsRequired();
-
-                        j.HasKey("Id");
-                        j.HasIndex("JobId", "SourceId")
-                            .IsUnique();
-                    });
+                .WithOne(e => e.Source)
+                .HasForeignKey("source_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // PlaylistSourceChannel
@@ -197,10 +183,10 @@ public class WorkerContext(IConfiguration config) : DbContext
 
             if (entry.State == EntityState.Added)
             {
-                entity.CreatedAt = TimeProvider.Current.Now;
+                entity.CreatedAt = timeProvider.GetUtcNow().DateTime;
             }
 
-            entity.UpdatedAt = TimeProvider.Current.Now;
+            entity.UpdatedAt = timeProvider.GetUtcNow().DateTime;
         }
     }
 }

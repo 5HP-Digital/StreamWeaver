@@ -2,7 +2,7 @@
 
 public enum JobState
 {
-    Pending,
+    Queued,
     InProgress,
     Completed,
     Failed
