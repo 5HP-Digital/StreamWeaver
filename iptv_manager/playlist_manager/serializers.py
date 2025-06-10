@@ -8,11 +8,12 @@ class PlaylistSourceSerializer(serializers.ModelSerializer):
     """
     channel_count = serializers.SerializerMethodField()
     last_synced = serializers.SerializerMethodField()
+    active_job_id = serializers.SerializerMethodField()
 
     class Meta:
         model = PlaylistSource
-        fields = ['id', 'name', 'url', 'is_enabled', 'created_at', 'updated_at', 'channel_count', 'last_synced']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'channel_count', 'last_synced']
+        fields = ['id', 'name', 'url', 'is_enabled', 'created_at', 'updated_at', 'channel_count', 'last_synced', 'active_job_id']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'channel_count', 'last_synced', 'active_job_id']
 
     def get_channel_count(self, obj):
         """
@@ -27,6 +28,15 @@ class PlaylistSourceSerializer(serializers.ModelSerializer):
         last_job = obj.jobs.filter(state=JobState.COMPLETED).order_by('-updated_at').first()
         if last_job:
             return last_job.updated_at
+        return None
+
+    def get_active_job_id(self, obj):
+        """
+        Get whether an active sync job is in progress.
+        """
+        active_jobs = obj.jobs.filter(state__in=[JobState.QUEUED, JobState.IN_PROGRESS])
+        if active_jobs.exists():
+            return active_jobs.first().job_id
         return None
 
 

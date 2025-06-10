@@ -83,7 +83,8 @@ class SettingsView(APIView):
             settings_data = {
                 "sync_enabled": False,
                 "sync_schedules": [],
-                "allow_channel_auto_deletion": True
+                "allow_channel_auto_deletion": True,
+                "sync_job_max_attempts": 3
             }
             # Save default settings to config store
             config_store.set("iptv:settings", settings_data)

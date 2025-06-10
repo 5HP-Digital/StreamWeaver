@@ -15,6 +15,30 @@
     .modal-backdrop {
         opacity: 0.5;
     }
+    .channel-count-link {
+        color: #0d6efd;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+    .channel-count-link:hover {
+        color: #0a58ca;
+    }
+    .inactive-channel {
+        opacity: 0.5;
+    }
+    .channel-logo {
+        max-width: 40px;
+        max-height: 40px;
+        margin-right: 10px;
+    }
+    .copy-btn {
+        cursor: pointer;
+    }
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
 </style>
 {% endblock %}
 
@@ -101,6 +125,17 @@
                 <input type="checkbox" class="form-check-input" id="allowChannelAutoDeletion" v-model="settings.allow_channel_auto_deletion" @change="onSettingsChange">
                 <label class="form-check-label" for="allowChannelAutoDeletion">Allow Channel Auto-Deletion</label>
             </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="syncJobMaxAttempts">Failed Sync Attempt Limit</label>
+                <div class="d-flex align-items-center">
+                    <select class="form-select" id="syncJobMaxAttempts" v-model="settings.sync_job_max_attempts" @change="onSettingsChange">
+                        <option v-for="n in 100" :key="n" :value="n">[[ n ]]</option>
+                        <option :value="null">Unlimited</option>
+                    </select>
+                </div>
+                <div class="form-text">Maximum number of retry attempts for failed sync jobs. Select "Unlimited" for no limit.</div>
+            </div>
         </div>
     </div>
 
@@ -142,10 +177,17 @@
                         </div>
                     </div>
                     <p class="card-text">
-                        <strong>URL:</strong> <a :href="source.url" target="_blank">[[ source.url ]]</a>
+                        <strong>URL:</strong> <a :href="source.url" target="_blank" class="url-ellipsis">[[ source.url ]]</a>
                     </p>
                     <p class="card-text">
-                        <strong>Channels:</strong> [[ source.channel_count || 0 ]]<br>
+                        <strong>Channels:</strong> 
+                        <span v-if="source.channel_count > 0" 
+                              class="channel-count-link" 
+                              @click="showChannelsModal(source)">
+                            [[ source.channel_count ]]
+                        </span>
+                        <span v-else>[[ 0 ]]</span>
+                        <br>
                         <strong>Last Synced:</strong> [[ source.last_synced ? formatDate(source.last_synced) : 'Never' ]]
                     </p>
                     <p class="card-text">
@@ -161,8 +203,8 @@
                         <button class="btn btn-sm btn-danger" @click="confirmDelete(source)">
                             <i class="bi bi-trash"></i> Delete
                         </button>
-                        <button class="btn btn-sm btn-success" @click="syncSource(source)" :disabled="source.syncInProgress || !source.is_enabled">
-                            <i class="bi" :class="source.syncInProgress ? 'bi-hourglass-split' : 'bi-arrow-repeat'"></i> Sync Now
+                        <button class="btn btn-sm btn-success" @click="syncSource(source)" :disabled="source.syncInProgress || !source.is_enabled || source.active_job_id">
+                            <i class="bi" :class="source.syncInProgress || source.active_job_id ? 'bi-hourglass-split' : 'bi-arrow-repeat'"></i> Sync Now
                         </button>
                     </div>
                 </div>
@@ -277,6 +319,99 @@
             </div>
         </div>
     </div>
+
+    <!-- Channels List Modal -->
+    <div class="modal fade channel-list-modal" id="channelsModal" tabindex="-1" aria-labelledby="channelsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="channelsModalLabel">Channels for "[[ currentSource.name ]]"</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="channelsLoading" class="text-center p-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Loading channels...</p>
+                    </div>
+
+                    <div v-else-if="channelsError" class="alert alert-danger">
+                        [[ channelsError ]]
+                    </div>
+
+                    <div v-else-if="channels.length === 0" class="alert alert-info">
+                        No channels found for this provider.
+                    </div>
+
+                    <div v-else>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Name</th>
+                                        <th>TVG-ID</th>
+                                        <th>Group</th>
+                                        <th>Updated</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="channel in channels" :key="channel.id" :class="{'inactive-channel': !channel.is_active}">
+                                        <td>
+                                            <img v-if="channel.logo_url" :src="channel.logo_url" class="channel-logo" @error="handleLogoError">
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                [[ channel.title ]]
+                                            </div>
+                                        </td>
+                                        <td>[[ channel.tvg_id ]]</td>
+                                        <td>[[ channel.group ]]</td>
+                                        <td>[[ formatDate(channel.updated_at) ]]</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" @click="copyStreamUrl(channel.media_url, $event)">
+                                                Stream <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="pagination-container" v-if="channelsTotalPages > 1">
+                            <nav aria-label="Channel list pagination">
+                                <ul class="pagination">
+                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(1)">First</a>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(channelsCurrentPage - 1)">Previous</a>
+                                    </li>
+
+                                    <li v-for="page in paginationPages" :key="page" class="page-item" :class="{ active: channelsCurrentPage === page }">
+                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(page)">[[ page ]]</a>
+                                    </li>
+
+                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === channelsTotalPages }">
+                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(channelsCurrentPage + 1)">Next</a>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === channelsTotalPages }">
+                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(channelsTotalPages)">Last</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -301,6 +436,7 @@
             sourceModal: null,
             deleteModal: null,
             syncModal: null,
+            channelsModal: null,
             // Sync data
             syncStatus: null, // queued, in_progress, completed, error
             syncSuccess: false,
@@ -309,11 +445,19 @@
             syncElapsedTime: '00:00:00',
             syncTimer: null,
             syncErrorMessage: null,
+            // Channels data
+            channels: [],
+            channelsLoading: false,
+            channelsError: null,
+            channelsCurrentPage: 1,
+            channelsTotalPages: 1,
+            channelsPageSize: 10,
             // Settings data
             settings: {
                 sync_enabled: false,
                 sync_schedules: [],
-                allow_channel_auto_deletion: true
+                allow_channel_auto_deletion: true,
+                sync_job_max_attempts: 3
             },
             settingsStatus: 'idle', // idle, modified, saving, saved
             settingsError: null,
@@ -326,6 +470,7 @@
             this.sourceModal = new bootstrap.Modal(document.getElementById('sourceModal'));
             this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
             this.syncModal = new bootstrap.Modal(document.getElementById('syncModal'));
+            this.channelsModal = new bootstrap.Modal(document.getElementById('channelsModal'));
 
             // Add event listener for sync modal close
             document.getElementById('syncModal').addEventListener('hidden.bs.modal', () => {
@@ -333,6 +478,30 @@
                 // This allows the sync to continue in the background
                 console.log('Sync modal closed, job continues in background');
             });
+        },
+        computed: {
+            paginationPages() {
+                // Generate an array of page numbers to display in pagination
+                // Show at most 5 pages, centered around the current page
+                const totalPages = this.channelsTotalPages;
+                const currentPage = this.channelsCurrentPage;
+
+                if (totalPages <= 5) {
+                    // If there are 5 or fewer pages, show all of them
+                    return Array.from({ length: totalPages }, (_, i) => i + 1);
+                } else {
+                    // Otherwise, show 5 pages centered around the current page
+                    let startPage = Math.max(currentPage - 2, 1);
+                    let endPage = startPage + 4;
+
+                    if (endPage > totalPages) {
+                        endPage = totalPages;
+                        startPage = Math.max(endPage - 4, 1);
+                    }
+
+                    return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+                }
+            }
         },
         methods: {
             fetchSources() {
@@ -843,6 +1012,83 @@
                 }
 
                 this.onSettingsChange();
+            },
+
+            // Channel list methods
+            showChannelsModal(source) {
+                // Set current source
+                this.currentSource = {
+                    id: source.id,
+                    name: source.name,
+                    url: source.url
+                };
+
+                // Reset channels data
+                this.channels = [];
+                this.channelsCurrentPage = 1;
+                this.channelsTotalPages = 1;
+                this.channelsError = null;
+
+                // Show modal
+                this.channelsModal.show();
+
+                // Load first page of channels
+                this.loadChannelsPage(1);
+            },
+
+            loadChannelsPage(page) {
+                this.channelsLoading = true;
+                this.channelsError = null;
+
+                // Fetch channels for the specified page
+                axios.get(`/api/sources/${this.currentSource.id}/channels/`, {
+                    params: {
+                        page: page,
+                        size: this.channelsPageSize
+                    }
+                })
+                .then(response => {
+                    // Update channels data
+                    this.channels = response.data.items;
+                    this.channelsCurrentPage = response.data.page;
+                    this.channelsTotalPages = Math.ceil(response.data.total / this.channelsPageSize);
+                    this.channelsLoading = false;
+                })
+                .catch(error => {
+                    console.error('Error fetching channels:', error);
+                    this.channelsError = 'Failed to load channels. Please try again.';
+                    this.channelsLoading = false;
+                });
+            },
+
+            handleLogoError(event) {
+                // Replace broken image with a placeholder or hide it
+                event.target.style.display = 'none';
+            },
+
+            copyStreamUrl(url, event) {
+                // Copy the stream URL to clipboard
+                navigator.clipboard.writeText(url)
+                    .then(() => {
+                        // Show a temporary success message
+                        const button = event.target.closest('button');
+                        const originalText = button.innerHTML;
+
+                        button.innerHTML = '<i class="bi bi-check"></i> Copied!';
+                        button.classList.remove('btn-outline-primary');
+                        button.classList.add('btn-success');
+
+                        // Reset button after 2 seconds
+                        setTimeout(() => {
+                            button.innerHTML = originalText;
+                            button.classList.remove('btn-success');
+                            button.classList.add('btn-outline-primary');
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy URL:', err);
+                        alert('Failed to copy URL. Please try again.');
+                    });
             }
         }
     });

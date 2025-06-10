@@ -54,7 +54,7 @@ class SourcesViewSet(viewsets.ViewSet):
         # Create the job
         job = source.jobs.create(
             state=JobState.QUEUED,
-            max_attempts=3, # TODO: set config
+            max_attempts=1, # when running manual sync, allow one failure only
             allow_channel_auto_deletion=settings_data.get("allow_channel_auto_deletion")
         )
 
@@ -225,7 +225,7 @@ class ChannelsViewSet(viewsets.ViewSet):
         skip = (page - 1) * size
 
         # Get the channels for the current page
-        channels = query.order_by('tvg_id')[skip:skip+size]
+        channels = query.order_by('group', 'title')[skip:skip+size]
 
         # Create response with pagination links
         base_url = request.build_absolute_uri().split('?')[0]

@@ -32,6 +32,7 @@ class SettingsSerializer(serializers.Serializer):
         child=SyncScheduleSerializer(),
         default=list
     )
+    sync_job_max_attempts = serializers.IntegerField(default=3, min_value=1, max_value=100, allow_null=True)
     allow_channel_auto_deletion = serializers.BooleanField(default=True)
 
     def create(self, validated_data):
