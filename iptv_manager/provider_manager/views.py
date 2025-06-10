@@ -2,42 +2,44 @@ from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from math import ceil
 
-from .models import PlaylistSource, PlaylistSourceChannel, PlaylistSyncJob, JobState
+from .models import Provider, ProviderChannel, ProviderSyncJob, JobState
 from .serializers import (
-    PlaylistSourceSerializer,
-    PlaylistSourceCreateSerializer,
-    PlaylistSourceUpdateSerializer,
-    PlaylistSourceChannelSerializer
+    ProviderSerializer,
+    ProviderCreateSerializer,
+    ProviderUpdateSerializer,
+    ProviderChannelSerializer,
+    ProviderSyncJobSerializer
 )
 from iptv_manager.utils import ConfigStore
 
-class SourcesViewSet(viewsets.ViewSet):
+class ProvidersViewSet(viewsets.ViewSet):
     """
-    API endpoint for playlist sources.
+    API endpoint for providers.
     Based on IPTV.PlaylistManager/Controllers/SourcesControllers.cs
     """
 
     @action(detail=True, methods=['post'])
     def sync(self, request, pk=None):
         """
-        Manually trigger a playlist source synchronization.
+        Manually trigger a provider synchronization.
 
         Returns:
             Response: A response containing the job ID and initial status.
         """
-        source = get_object_or_404(PlaylistSource, pk=pk)
+        provider = get_object_or_404(Provider, pk=pk)
 
-        # Check if source is enabled
-        if not source.is_enabled:
+        # Check if provider is enabled
+        if not provider.is_enabled:
             return Response(
                 {"error": "Cannot sync disabled service provider"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Check if there's already a sync job in progress or queued for this source
-        active_jobs = source.jobs.filter(state__in=[JobState.QUEUED, JobState.IN_PROGRESS])
+        # Check if there's already a sync job in progress or queued for this provider
+        active_jobs = provider.jobs.filter(state__in=[JobState.QUEUED, JobState.IN_PROGRESS])
 
         if active_jobs.exists():
             job = active_jobs.first()
@@ -52,7 +54,7 @@ class SourcesViewSet(viewsets.ViewSet):
         settings_data = config_store.get("iptv:settings")
 
         # Create the job
-        job = source.jobs.create(
+        job = provider.jobs.create(
             state=JobState.QUEUED,
             max_attempts=1, # when running manual sync, allow one failure only
             allow_channel_auto_deletion=settings_data.get("allow_channel_auto_deletion")
@@ -69,7 +71,7 @@ class SourcesViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['get'])
     def sync_status(self, request, pk=None):
         """
-        Get the status of a sync job for a playlist source.
+        Get the status of a sync job for a provider.
 
         Query Parameters:
             job_id: The UUID of the job to check.
@@ -78,17 +80,17 @@ class SourcesViewSet(viewsets.ViewSet):
             Response: A response containing the job status.
         """
 
-        source = get_object_or_404(PlaylistSource, pk=pk)
+        provider = get_object_or_404(Provider, pk=pk)
         job_id = request.query_params.get('job_id')
 
         try:
             if job_id:
                 # Get the job by UUID
-                job = source.jobs.filter(job_id=job_id).first()
+                job = provider.jobs.filter(job_id=job_id).first()
             else:
-                if source.jobs.exists():
+                if provider.jobs.exists():
                     # Get the most recent job
-                    job = source.jobs.order_by('-created_at').first()
+                    job = provider.jobs.order_by('-created_at').first()
                 else:
                     return Response({
                         "error": "Job not found"
@@ -127,7 +129,7 @@ class SourcesViewSet(viewsets.ViewSet):
                     "status": "unknown",
                     "message": f"Unknown job state: {job.state}"
                 })
-        except PlaylistSyncJob.DoesNotExist:
+        except ProviderSyncJob.DoesNotExist:
             return Response({
                 "job_id": job_id,
                 "status": "error",
@@ -140,39 +142,39 @@ class SourcesViewSet(viewsets.ViewSet):
 
     def list(self, request):
         """
-        Get all playlist sources.
+        Get all providers.
         """
-        sources = PlaylistSource.objects.all()
-        serializer = PlaylistSourceSerializer(sources, many=True)
+        providers = Provider.objects.all()
+        serializer = ProviderSerializer(providers, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
         """
-        Get a specific playlist source by ID.
+        Get a specific provider by ID.
         """
-        source = get_object_or_404(PlaylistSource.objects.prefetch_related('jobs'), pk=pk)
-        serializer = PlaylistSourceSerializer(source)
+        provider = get_object_or_404(Provider.objects.prefetch_related('jobs'), pk=pk)
+        serializer = ProviderSerializer(provider)
         return Response(serializer.data)
 
     def create(self, request):
         """
-        Create a new playlist source.
+        Create a new provider.
         """
-        serializer = PlaylistSourceCreateSerializer(data=request.data)
+        serializer = ProviderCreateSerializer(data=request.data)
         if serializer.is_valid():
-            source = serializer.save()
+            provider = serializer.save()
             return Response(
-                PlaylistSourceSerializer(source).data, 
+                ProviderSerializer(provider).data, 
                 status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, pk=None):
         """
-        Update a playlist source.
+        Update a provider.
         """
-        source = get_object_or_404(PlaylistSource, pk=pk)
-        serializer = PlaylistSourceUpdateSerializer(source, data=request.data, partial=True)
+        provider = get_object_or_404(Provider, pk=pk)
+        serializer = ProviderUpdateSerializer(provider, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -180,22 +182,31 @@ class SourcesViewSet(viewsets.ViewSet):
 
     def destroy(self, request, pk=None):
         """
-        Delete a playlist source.
+        Delete a provider.
         """
-        source = get_object_or_404(PlaylistSource, pk=pk)
-        source.delete()
+        provider = get_object_or_404(Provider, pk=pk)
+        provider.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-class ChannelsViewSet(viewsets.ViewSet):
-    """
-    API endpoint for playlist source channels.
-    Based on IPTV.PlaylistManager/Controllers/ChannelsControllers.cs
-    """
-
-    def list(self, request, source_id=None):
+    @action(detail=True, methods=['get'])
+    def jobs(self, request, pk=None):
         """
-        Get channels for a specific playlist source with pagination.
+        Get sync job history for a provider with pagination.
+
+        Active jobs (those in Queued or InProgress state) are returned separately
+        from the paginated history list.
+
+        Query Parameters:
+            page: The page number (default: 1)
+            size: The page size (default: 10)
+
+        Returns:
+            Response: A response containing:
+                - active_jobs: A list of active sync jobs for the provider
+                - page: The current page number
+                - total: The total number of non-active jobs
+                - items: A paginated list of non-active sync jobs
+                - links: Pagination links
         """
         # Validate pagination parameters
         page = int(request.query_params.get('page', 1))
@@ -213,11 +224,84 @@ class ChannelsViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Check if source exists
-        source = get_object_or_404(PlaylistSource, pk=source_id)
+        # Check if provider exists
+        provider = get_object_or_404(Provider, pk=pk)
 
-        # Get total count of channels for this source
-        query = PlaylistSourceChannel.objects.filter(source=source)
+        # Get active jobs (Queued or InProgress)
+        active_jobs = ProviderSyncJob.objects.filter(
+            provider=provider,
+            state__in=[JobState.QUEUED, JobState.IN_PROGRESS]
+        ).order_by('-updated_at')
+
+        # Get non-active jobs (Completed or Failed)
+        non_active_jobs = ProviderSyncJob.objects.filter(
+            provider=provider,
+            state__in=[JobState.COMPLETED, JobState.FAILED]
+        )
+
+        # Get total count of non-active jobs
+        total_items = non_active_jobs.count()
+
+        # Calculate pagination values
+        total_pages = ceil(total_items / size) if total_items > 0 else 1
+        skip = (page - 1) * size
+
+        # Get the non-active jobs for the current page, ordered by updated_at descending
+        paginated_jobs = non_active_jobs.order_by('-updated_at')[skip:skip+size]
+
+        # Create response with pagination links
+        base_url = request.build_absolute_uri().split('?')[0]
+
+        response_data = {
+            'page': page,
+            'total': total_items,
+            'items': ProviderSyncJobSerializer(paginated_jobs, many=True).data,
+            'links': {}
+        }
+
+        # Add pagination links
+        if page > 1:
+            response_data['links']['first'] = f"{base_url}?page=1&size={size}"
+            response_data['links']['previous'] = f"{base_url}?page={page - 1}&size={size}"
+
+        if page < total_pages:
+            response_data['links']['next'] = f"{base_url}?page={page + 1}&size={size}"
+            response_data['links']['last'] = f"{base_url}?page={total_pages}&size={size}"
+
+        return Response(response_data)
+
+
+class ProviderChannelsViewSet(viewsets.ViewSet):
+    """
+    API endpoint for provider channels.
+    Based on IPTV.PlaylistManager/Controllers/ChannelsControllers.cs
+    """
+
+    def list(self, request, provider_id=None):
+        """
+        Get channels for a specific provider with pagination.
+        """
+        # Validate pagination parameters
+        page = int(request.query_params.get('page', 1))
+        size = int(request.query_params.get('size', 10))
+
+        if page < 1:
+            return Response(
+                {"error": "Page number must be greater than or equal to 1"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if size < 1 or size > 100:
+            return Response(
+                {"error": "Page size must be between 1 and 100"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if provider exists
+        provider = get_object_or_404(Provider, pk=provider_id)
+
+        # Get total count of channels for this provider
+        query = ProviderChannel.objects.filter(provider=provider)
         total_items = query.count()
 
         # Calculate pagination values
@@ -233,7 +317,7 @@ class ChannelsViewSet(viewsets.ViewSet):
         response_data = {
             'page': page,
             'total': total_items,
-            'items': PlaylistSourceChannelSerializer(channels, many=True).data,
+            'items': ProviderChannelSerializer(channels, many=True).data,
             'links': {}
         }
 

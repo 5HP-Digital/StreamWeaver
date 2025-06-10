@@ -8,7 +8,7 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('playlist_manager', '0003_playlistsourceinvocation_completed'),
+        ('provider_manager', '0003_playlistsourceinvocation_completed'),
     ]
 
     operations = [
@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
                 ('allow_channel_auto_deletion', models.BooleanField(default=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='jobs', to='playlist_manager.playlistsource')),
+                ('source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='jobs', to='provider_manager.playlistsource')),
             ],
         ),
         migrations.DeleteModel(

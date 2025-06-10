@@ -5,5 +5,5 @@ app_name = 'home'
 
 urlpatterns = [
     path('', views.index, name='index'),
-    path('iptv/', views.iptv, name='iptv'),
+    path('providers/', views.providers, name='providers'),
 ]

@@ -1,23 +1,23 @@
 ﻿from rest_framework import serializers
-from .models import PlaylistSource, PlaylistSourceChannel, JobState
+from .models import Provider, ProviderChannel, ProviderSyncJob, JobState
 
 
-class PlaylistSourceSerializer(serializers.ModelSerializer):
+class ProviderSerializer(serializers.ModelSerializer):
     """
-    Serializer for PlaylistSource model.
+    Serializer for Provider model.
     """
     channel_count = serializers.SerializerMethodField()
     last_synced = serializers.SerializerMethodField()
     active_job_id = serializers.SerializerMethodField()
 
     class Meta:
-        model = PlaylistSource
+        model = Provider
         fields = ['id', 'name', 'url', 'is_enabled', 'created_at', 'updated_at', 'channel_count', 'last_synced', 'active_job_id']
         read_only_fields = ['id', 'created_at', 'updated_at', 'channel_count', 'last_synced', 'active_job_id']
 
     def get_channel_count(self, obj):
         """
-        Get the number of channels associated with this PlaylistSource.
+        Get the number of channels associated with this Provider.
         """
         return obj.channels.count()
 
@@ -40,33 +40,44 @@ class PlaylistSourceSerializer(serializers.ModelSerializer):
         return None
 
 
-class PlaylistSourceCreateSerializer(serializers.ModelSerializer):
+class ProviderCreateSerializer(serializers.ModelSerializer):
     """
-    Serializer for creating a PlaylistSource.
+    Serializer for creating a Provider.
     """
     class Meta:
-        model = PlaylistSource
+        model = Provider
         fields = ['name', 'url']
 
 
-class PlaylistSourceUpdateSerializer(serializers.ModelSerializer):
+class ProviderUpdateSerializer(serializers.ModelSerializer):
     """
-    Serializer for updating a PlaylistSource.
+    Serializer for updating a Provider.
     """
     name = serializers.CharField(required=False)
     url = serializers.URLField(required=False)
     is_enabled = serializers.BooleanField(required=False)
 
     class Meta:
-        model = PlaylistSource
+        model = Provider
         fields = ['name', 'url', 'is_enabled']
 
 
-class PlaylistSourceChannelSerializer(serializers.ModelSerializer):
+class ProviderChannelSerializer(serializers.ModelSerializer):
     """
-    Serializer for PlaylistSourceChannel model.
+    Serializer for ProviderChannel model.
     """
     class Meta:
-        model = PlaylistSourceChannel
+        model = ProviderChannel
         fields = ['id', 'title', 'tvg_id', 'media_url', 'logo_url', 'group', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ProviderSyncJobSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ProviderSyncJob model.
+    """
+    class Meta:
+        model = ProviderSyncJob
+        fields = ['id', 'job_id', 'state', 'status_description', 'last_attempt_started_at', 
+                  'attempt_count', 'max_attempts', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'job_id', 'created_at', 'updated_at']

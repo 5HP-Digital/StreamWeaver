@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('playlist_manager', '0002_alter_playlistsource_url_and_more'),
+        ('provider_manager', '0002_alter_playlistsource_url_and_more'),
     ]
 
     operations = [

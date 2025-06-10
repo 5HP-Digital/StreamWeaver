@@ -14,9 +14,9 @@ class JobState(models.TextChoices):
     FAILED = 'Failed'
 
 
-class PlaylistSource(models.Model):
+class Provider(models.Model):
     """
-    Model representing a playlist source.
+    Model representing a provider.
     Based on IPTV.PlaylistManager/Data/PlaylistSource.cs
     """
     name = models.CharField(max_length=255)
@@ -29,7 +29,7 @@ class PlaylistSource(models.Model):
         return self.name
 
 
-class PlaylistSyncJob(models.Model):
+class ProviderSyncJob(models.Model):
     """
     Model representing a job.
     Based on IPTV.JobWorker/Data/Job.cs
@@ -47,23 +47,23 @@ class PlaylistSyncJob(models.Model):
     allow_channel_auto_deletion = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    source = models.ForeignKey(
-        PlaylistSource,
+    provider = models.ForeignKey(
+        Provider,
         on_delete=models.CASCADE,
         related_name='jobs'
     )
 
     def __str__(self):
-        return f"PlaylistSyncJob {self.job_id} - {self.state}"
+        return f"ProviderSyncJob {self.job_id} - {self.state}"
 
 
-class PlaylistSourceChannel(models.Model):
+class ProviderChannel(models.Model):
     """
-    Model representing a channel within a playlist source.
+    Model representing a channel within a provider.
     Based on IPTV.PlaylistManager/Data/PlaylistSourceChannel.cs
     """
-    source = models.ForeignKey(
-        PlaylistSource, 
+    provider = models.ForeignKey(
+        Provider, 
         on_delete=models.CASCADE, 
         related_name='channels'
     )

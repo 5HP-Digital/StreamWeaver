@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
                 ('error', models.TextField(blank=True, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='invocations', to='playlist_manager.playlistsource')),
+                ('source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='invocations', to='provider_manager.playlistsource')),
             ],
         ),
         migrations.CreateModel(
@@ -45,7 +45,7 @@ class Migration(migrations.Migration):
                 ('is_active', models.BooleanField(default=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='channels', to='playlist_manager.playlistsource')),
+                ('source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='channels', to='provider_manager.playlistsource')),
             ],
         ),
     ]

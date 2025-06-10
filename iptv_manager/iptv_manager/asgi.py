@@ -9,7 +9,7 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 from django.core.asgi import get_asgi_application
 from django.urls import path
-from home.consumers import SystemStatsConsumer
+from home.consumers import SystemStatsConsumer, ActiveJobsConsumer
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'iptv_manager.settings')
 
@@ -19,6 +19,7 @@ application = ProtocolTypeRouter({
         AuthMiddlewareStack(
             URLRouter([
                     path('ws/system-stats/', SystemStatsConsumer.as_asgi()),
+                    path('ws/active-jobs/', ActiveJobsConsumer.as_asgi()),
                 ]
             )
         )

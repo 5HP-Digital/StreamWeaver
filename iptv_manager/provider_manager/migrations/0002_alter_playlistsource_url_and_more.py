@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('playlist_manager', '0001_initial'),
+        ('provider_manager', '0001_initial'),
     ]
 
     operations = [

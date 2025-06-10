@@ -5,7 +5,7 @@
     .card {
         margin-bottom: 20px;
     }
-    .source-card {
+    .provider-card {
         height: 100%;
     }
     .action-buttons {
@@ -31,13 +31,42 @@
         max-height: 40px;
         margin-right: 10px;
     }
-    .copy-btn {
-        cursor: pointer;
-    }
     .pagination-container {
         display: flex;
         justify-content: center;
         margin-top: 20px;
+    }
+    .active-jobs-section {
+        margin-bottom: 20px;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 20px;
+    }
+    .job-state-badge {
+        display: inline-block;
+        padding: 0.25em 0.4em;
+        font-size: 75%;
+        font-weight: 700;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 0.25rem;
+    }
+    .job-state-queued {
+        background-color: #17a2b8;
+        color: white;
+    }
+    .job-state-inprogress {
+        background-color: #ffc107;
+        color: black;
+    }
+    .job-state-completed {
+        background-color: #28a745;
+        color: white;
+    }
+    .job-state-failed {
+        background-color: #dc3545;
+        color: white;
     }
 </style>
 {% endblock %}
@@ -158,53 +187,58 @@
     </div>
 
     <div class="row" v-if="!loading && !error">
-        <div v-if="sources.length === 0" class="col-12">
+        <div v-if="providers.length === 0" class="col-12">
             <div class="alert alert-warning">
                 No providers found. Click "Add New Provider" to create one.
             </div>
         </div>
-        <div v-for="source in sources" :key="source.id" class="col-md-4 mb-4">
-            <div class="card source-card">
+        <div v-for="provider in providers" :key="provider.id" class="col-md-4 mb-4">
+            <div class="card provider-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h5 class="card-title mb-0">[[ source.name ]]</h5>
+                        <h5 class="card-title mb-0">[[ provider.name ]]</h5>
                         <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" :id="'toggle-' + source.id"
-                                v-model="source.is_enabled" @change="toggleSourceEnabled(source)">
-                            <label class="form-check-label" :for="'toggle-' + source.id">
-                                [[ source.is_enabled ? 'Enabled' : 'Disabled' ]]
+                            <input class="form-check-input" type="checkbox" :id="'toggle-' + provider.id"
+                                v-model="provider.is_enabled" @change="toggleProviderEnabled(provider)">
+                            <label class="form-check-label" :for="'toggle-' + provider.id">
+                                [[ provider.is_enabled ? 'Enabled' : 'Disabled' ]]
                             </label>
                         </div>
                     </div>
                     <p class="card-text">
-                        <strong>URL:</strong> <a :href="source.url" target="_blank" class="url-ellipsis">[[ source.url ]]</a>
+                        <strong>URL:</strong> <a :href="provider.url" target="_blank" class="url-ellipsis">[[ provider.url ]]</a>
                     </p>
                     <p class="card-text">
                         <strong>Channels:</strong> 
-                        <span v-if="source.channel_count > 0" 
+                        <span v-if="provider.channel_count > 0"
                               class="channel-count-link" 
-                              @click="showChannelsModal(source)">
-                            [[ source.channel_count ]]
+                              @click="showChannelsModal(provider)">
+                            [[ provider.channel_count ]]
                         </span>
                         <span v-else>[[ 0 ]]</span>
                         <br>
-                        <strong>Last Synced:</strong> [[ source.last_synced ? formatDate(source.last_synced) : 'Never' ]]
+                        <strong>Last Synced:</strong> [[ provider.last_synced ? formatDate(provider.last_synced) : 'Never' ]]
                     </p>
                     <p class="card-text">
                         <small class="text-muted">
-                            Created: [[ formatDate(source.created_at) ]]<br>
-                            Updated: [[ formatDate(source.updated_at) ]]
+                            Created: [[ formatDate(provider.created_at) ]]<br>
+                            Updated: [[ formatDate(provider.updated_at) ]]
                         </small>
                     </p>
                     <div class="action-buttons">
-                        <button class="btn btn-sm btn-primary" @click="showEditModal(source)">
+                        <button class="btn btn-sm btn-primary" @click="showEditModal(provider)">
                             <i class="bi bi-pencil"></i> Edit
                         </button>
-                        <button class="btn btn-sm btn-danger" @click="confirmDelete(source)">
+                        <button class="btn btn-sm btn-danger" @click="confirmDelete(provider)">
                             <i class="bi bi-trash"></i> Delete
                         </button>
-                        <button class="btn btn-sm btn-success" @click="syncSource(source)" :disabled="source.syncInProgress || !source.is_enabled || source.active_job_id">
-                            <i class="bi" :class="source.syncInProgress || source.active_job_id ? 'bi-hourglass-split' : 'bi-arrow-repeat'"></i> Sync Now
+                        <button class="btn btn-sm btn-success" @click="syncProvider(provider)" :disabled="!provider.is_enabled || provider.active_job_id">
+                            <i class="bi" :class="provider.active_job_id ? 'bi-hourglass-split' : 'bi-arrow-repeat'"></i>
+                            <span v-if="provider.active_job_id">Syncing...</span>
+                            <span v-else>Sync Now</span>
+                        </button>
+                        <button class="btn btn-sm btn-info" @click="showJobHistoryModal(provider)">
+                            <i class="bi bi-clock-history"></i> History
                         </button>
                     </div>
                 </div>
@@ -212,27 +246,27 @@
         </div>
     </div>
 
-    <!-- Add/Edit Source Modal -->
-    <div class="modal fade" id="sourceModal" tabindex="-1" aria-labelledby="sourceModalLabel" aria-hidden="true">
+    <!-- Add/Edit Provider Modal -->
+    <div class="modal fade" id="providerModal" tabindex="-1" aria-labelledby="providerModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="sourceModalLabel">[[ editMode ? 'Edit' : 'Add' ]] Provider</h5>
+                    <h5 class="modal-title" id="providerModalLabel">[[ editMode ? 'Edit' : 'Add' ]] Provider</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-danger" v-if="formError">
                         [[ formError ]]
                     </div>
-                    <form @submit.prevent="saveSource">
+                    <form @submit.prevent="saveProvider">
                         <div class="mb-3">
-                            <label for="sourceName" class="form-label">Name</label>
-                            <input type="text" class="form-control" id="sourceName" v-model="currentSource.name" required maxlength="100">
+                            <label for="providerName" class="form-label">Name</label>
+                            <input type="text" class="form-control" id="providerName" v-model="currentProvider.name" required maxlength="100">
                             <div class="form-text">Required, maximum 100 characters</div>
                         </div>
                         <div class="mb-3">
-                            <label for="sourceUrl" class="form-label">URL</label>
-                            <input type="url" class="form-control" id="sourceUrl" v-model="currentSource.url" required maxlength="500">
+                            <label for="providerUrl" class="form-label">URL</label>
+                            <input type="url" class="form-control" id="providerUrl" v-model="currentProvider.url" required maxlength="500">
                             <div class="form-text">Required, must be a valid URL, maximum 500 characters</div>
                         </div>
                         <div class="d-flex justify-content-end">
@@ -257,64 +291,15 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure you want to delete the provider "[[ currentSource.name ]]"?</p>
+                    <p>Are you sure you want to delete the provider "[[ currentProvider.name ]]"?</p>
                     <p class="text-danger">This action cannot be undone.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-danger" @click="deleteSource" :disabled="formSubmitting">
+                    <button type="button" class="btn btn-danger" @click="deleteProvider" :disabled="formSubmitting">
                         <span v-if="formSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                         Delete
                     </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Sync Progress Modal -->
-    <div class="modal fade" id="syncModal" tabindex="-1" aria-labelledby="syncModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="syncModalLabel">Synchronizing "[[ currentSource.name ]]"</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div v-if="syncStatus === 'queued'" class="text-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mt-3">Sync job has been queued and will start shortly...</p>
-                    </div>
-
-                    <div v-if="syncStatus === 'in_progress'" class="text-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mt-3">Synchronization in progress...</p>
-                        <p>Elapsed time: [[ syncElapsedTime ]]</p>
-                    </div>
-
-                    <div v-if="syncStatus === 'completed' && syncSuccess" class="text-center">
-                        <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
-                        <p class="mt-3">Synchronization completed successfully!</p>
-                        <p>Total time: [[ syncElapsedTime ]]</p>
-                    </div>
-
-                    <div v-if="syncStatus === 'completed' && !syncSuccess" class="text-center">
-                        <i class="bi bi-x-circle-fill text-danger" style="font-size: 3rem;"></i>
-                        <p class="mt-3">Synchronization failed.</p>
-                        <p>Total time: [[ syncElapsedTime ]]</p>
-                    </div>
-
-                    <div v-if="syncStatus === 'error'" class="text-center">
-                        <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 3rem;"></i>
-                        <p class="mt-3">An error occurred while checking sync status.</p>
-                        <p class="text-danger">[[ syncErrorMessage ]]</p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -325,7 +310,7 @@
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="channelsModalLabel">Channels for "[[ currentSource.name ]]"</h5>
+                    <h5 class="modal-title" id="channelsModalLabel">Channels for "[[ currentProvider.name ]]"</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -412,6 +397,141 @@
             </div>
         </div>
     </div>
+
+    <!-- Job History Modal -->
+    <div class="modal fade" id="jobHistoryModal" tabindex="-1" aria-labelledby="jobHistoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="jobHistoryModalLabel">Sync History for "[[ currentProvider.name ]]"</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="jobsLoading" class="text-center p-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Loading sync history...</p>
+                    </div>
+
+                    <div v-else-if="jobsError" class="alert alert-danger">
+                        [[ jobsError ]]
+                    </div>
+
+                    <div v-else-if="jobs.length === 0 && activeJobsForCurrentProvider.length === 0" class="alert alert-info">
+                        No sync jobs found for this provider.
+                    </div>
+
+                    <div v-else>
+                        <!-- Active Jobs Section -->
+                        <div v-if="activeJobsForCurrentProvider.length > 0" class="active-jobs-section">
+                            <h5 class="mb-3">Active Jobs</h5>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Status</th>
+                                            <th>Description</th>
+                                            <th>Attempts</th>
+                                            <th>Last Attempt</th>
+                                            <th>Updated</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="job in activeJobsForCurrentProvider" :key="job.id" :class="{'table-warning': job.state === 'InProgress', 'table-info': job.state === 'Queued'}">
+                                            <td>
+                                                <i class="bi" :class="{
+                                                    'bi-hourglass-split': job.state === 'InProgress',
+                                                    'bi-clock text-info': job.state === 'Queued'
+                                                }"></i>
+                                                <span class="job-state-badge" :class="{
+                                                    'job-state-inprogress': job.state === 'InProgress',
+                                                    'job-state-queued': job.state === 'Queued'
+                                                }">[[ job.state ]]</span>
+                                            </td>
+                                            <td>[[ job.status_description || 'No description' ]]</td>
+                                            <td>[[ job.attempt_count ]] / [[ job.max_attempts || '∞' ]]</td>
+                                            <td>[[ job.last_attempt_started_at ? formatDate(job.last_attempt_started_at) : 'Not started' ]]</td>
+                                            <td>[[ formatDate(job.updated_at) ]]</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- History Section -->
+                        <div v-if="jobs.length > 0">
+                            <h5 class="mb-3">History</h5>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Status</th>
+                                            <th>Description</th>
+                                            <th>Attempts</th>
+                                            <th>Last Attempt</th>
+                                            <th>Updated</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="job in jobs" :key="job.id" :class="{'table-success': job.state === 'Completed', 'table-danger': job.state === 'Failed'}">
+                                            <td>
+                                                <i class="bi" :class="{
+                                                    'bi-check-circle-fill text-success': job.state === 'Completed',
+                                                    'bi-x-circle-fill text-danger': job.state === 'Failed'
+                                                }"></i>
+                                                <span class="job-state-badge" :class="{
+                                                    'job-state-completed': job.state === 'Completed',
+                                                    'job-state-failed': job.state === 'Failed'
+                                                }">[[ job.state ]]</span>
+                                            </td>
+                                            <td>[[ job.status_description || 'No description' ]]</td>
+                                            <td>[[ job.attempt_count ]] / [[ job.max_attempts || '∞' ]]</td>
+                                            <td>[[ job.last_attempt_started_at ? formatDate(job.last_attempt_started_at) : 'Not started' ]]</td>
+                                            <td>[[ formatDate(job.updated_at) ]]</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Pagination -->
+                            <div class="pagination-container" v-if="jobsTotalPages > 1">
+                                <nav aria-label="Job history pagination">
+                                    <ul class="pagination">
+                                        <li class="page-item" :class="{ disabled: jobsCurrentPage === 1 }">
+                                            <a class="page-link" href="#" @click.prevent="loadJobsPage(1)">First</a>
+                                        </li>
+                                        <li class="page-item" :class="{ disabled: jobsCurrentPage === 1 }">
+                                            <a class="page-link" href="#" @click.prevent="loadJobsPage(jobsCurrentPage - 1)">Previous</a>
+                                        </li>
+
+                                        <li v-for="page in jobsPaginationPages" :key="page" class="page-item" :class="{ active: jobsCurrentPage === page }">
+                                            <a class="page-link" href="#" @click.prevent="loadJobsPage(page)">[[ page ]]</a>
+                                        </li>
+
+                                        <li class="page-item" :class="{ disabled: jobsCurrentPage === jobsTotalPages }">
+                                            <a class="page-link" href="#" @click.prevent="loadJobsPage(jobsCurrentPage + 1)">Next</a>
+                                        </li>
+                                        <li class="page-item" :class="{ disabled: jobsCurrentPage === jobsTotalPages }">
+                                            <a class="page-link" href="#" @click.prevent="loadJobsPage(jobsTotalPages)">Last</a>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" @click="syncProviderFromHistory()" :disabled="currentProvider.active_job_id">
+                        <i class="bi" :class="currentProvider.active_job_id ? 'bi-hourglass-split' : 'bi-arrow-repeat'"></i>
+                        <span v-if="currentProvider.active_job_id">Syncing...</span>
+                        <span v-else>Sync Now</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -422,29 +542,25 @@
         el: '#app',
         delimiters: ['[[', ']]'],
         data: {
-            sources: [],
+            providers: [],
             loading: true,
             error: null,
-            currentSource: {
+            currentProvider: {
                 id: null,
                 name: '',
-                url: ''
+                url: '',
+                channel_count: 0,
+                created_at: null,
+                updated_at: null,
+                last_sync_started_at: null
             },
             editMode: false,
             formError: null,
             formSubmitting: false,
-            sourceModal: null,
+            providerModal: null,
             deleteModal: null,
-            syncModal: null,
             channelsModal: null,
-            // Sync data
-            syncStatus: null, // queued, in_progress, completed, error
-            syncSuccess: false,
-            syncJobId: null,
-            syncStartTime: null,
-            syncElapsedTime: '00:00:00',
-            syncTimer: null,
-            syncErrorMessage: null,
+            jobHistoryModal: null,
             // Channels data
             channels: [],
             channelsLoading: false,
@@ -452,6 +568,17 @@
             channelsCurrentPage: 1,
             channelsTotalPages: 1,
             channelsPageSize: 10,
+            // Jobs data
+            jobs: [],
+            activeJobs: [],
+            jobsLoading: false,
+            jobsError: null,
+            jobsCurrentPage: 1,
+            jobsTotalPages: 1,
+            jobsPageSize: 10,
+            // WebSocket connections
+            activeJobsSocket: null,
+            jobDetailSockets: {},
             // Settings data
             settings: {
                 sync_enabled: false,
@@ -462,22 +589,23 @@
             settingsStatus: 'idle', // idle, modified, saving, saved
             settingsError: null,
             settingsTimeout: null,
-            daysOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            daysOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
         },
         mounted() {
-            this.fetchSources();
+            this.fetchProviders();
             this.fetchSettings();
-            this.sourceModal = new bootstrap.Modal(document.getElementById('sourceModal'));
+            this.providerModal = new bootstrap.Modal(document.getElementById('providerModal'));
             this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-            this.syncModal = new bootstrap.Modal(document.getElementById('syncModal'));
             this.channelsModal = new bootstrap.Modal(document.getElementById('channelsModal'));
+            this.jobHistoryModal = new bootstrap.Modal(document.getElementById('jobHistoryModal'));
 
-            // Add event listener for sync modal close
-            document.getElementById('syncModal').addEventListener('hidden.bs.modal', () => {
-                // Don't reset sync state when modal is closed
-                // This allows the sync to continue in the background
-                console.log('Sync modal closed, job continues in background');
-            });
+            // Connect to active jobs WebSocket
+            this.connectToActiveJobsWebSocket();
+        },
+
+        beforeDestroy() {
+            // Disconnect all WebSockets when component is destroyed
+            this.disconnectWebSockets();
         },
         computed: {
             paginationPages() {
@@ -501,200 +629,116 @@
 
                     return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
                 }
+            },
+            jobsPaginationPages() {
+                // Generate an array of page numbers to display in pagination
+                // Show at most 5 pages, centered around the current page
+                const totalPages = this.jobsTotalPages;
+                const currentPage = this.jobsCurrentPage;
+
+                if (totalPages <= 5) {
+                    // If there are 5 or fewer pages, show all of them
+                    return Array.from({ length: totalPages }, (_, i) => i + 1);
+                } else {
+                    // Otherwise, show 5 pages centered around the current page
+                    let startPage = Math.max(currentPage - 2, 1);
+                    let endPage = startPage + 4;
+
+                    if (endPage > totalPages) {
+                        endPage = totalPages;
+                        startPage = Math.max(endPage - 4, 1);
+                    }
+
+                    return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+                }
+            },
+            activeJobsForCurrentProvider() {
+                return this.activeJobs.filter(j => j.job_id === this.currentProvider.active_job_id);
             }
         },
         methods: {
-            fetchSources() {
+            fetchProviders() {
                 this.loading = true;
                 this.error = null;
 
-                axios.get('/api/sources/')
+                axios.get('/api/providers/')
                     .then(response => {
-                        // Initialize syncInProgress property for each source
-                        const sources = response.data.map(source => ({
-                            ...source,
-                            syncInProgress: false
-                        }));
-                        this.sources = sources;
+                        this.providers = response.data;
                         this.loading = false;
                     })
                     .catch(error => {
-                        console.error('Error fetching sources:', error);
-                        this.error = 'Failed to load playlist sources. Please try again later.';
+                        console.error('Error fetching providers:', error);
+                        this.error = 'Failed to load providers. Please try again later.';
                         this.loading = false;
                     });
             },
+            fetchProvider(providerId) {
+                axios.get(`/api/providers/${providerId}/`)
+                    .then(response => {
+                        const providerIndex = this.providers.findIndex(s => s.id === providerId);
+                        if (providerIndex !== -1) {
+                            this.providers[providerIndex] = response.data;
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error fetching provider '${providerId}':`, error);
+                        this.error = 'Failed to load provider. Please try again later.';
+                    });
+            },
 
-            syncSource(source) {
-                // Reset sync state
-                this.resetSyncState();
-
-                // Set current source
-                this.currentSource = {
-                    id: source.id,
-                    name: source.name,
-                    url: source.url
-                };
-
-                // Show sync modal
-                this.syncModal.show();
-
+            syncProvider(provider) {
                 // Start sync
-                axios.post(`/api/sources/${source.id}/sync/`)
+                axios.post(`/api/providers/${provider.id}/sync/`)
                     .then(response => {
                         console.log('Sync initiated:', response.data);
 
-                        // Update sync status
-                        this.syncStatus = response.data.status;
-                        this.syncJobId = response.data.job_id;
-                        this.syncStartTime = new Date();
-
-                        // Mark source as syncing
-                        const sourceIndex = this.sources.findIndex(s => s.id === source.id);
-                        if (sourceIndex !== -1) {
-                            this.sources[sourceIndex].syncInProgress = true;
-                        }
-
-                        // Start timer to update elapsed time
-                        this.startSyncTimer();
-
-                        // Start polling for sync status
-                        this.checkSyncStatus();
+                        provider.active_job_id = response.data.job_id;
                     })
                     .catch(error => {
                         console.error('Error initiating sync:', error);
-                        this.syncStatus = 'error';
-                        this.syncErrorMessage = error.response?.data?.error || 'Failed to initiate sync. Please try again.';
+
+                        // Show error in an alert
+                        alert('Failed to initiate sync: ' + (error.response?.data?.error || 'Please try again.'));
                     });
             },
 
-            checkSyncStatus() {
-                if (!this.syncJobId || this.syncStatus === 'completed' || this.syncStatus === 'error') {
-                    return;
-                }
-
-                axios.get(`/api/sources/${this.currentSource.id}/sync_status/`, {
-                    params: { job_id: this.syncJobId }
-                })
-                    .then(response => {
-                        console.log('Sync status:', response.data);
-
-                        // Update sync status
-                        this.syncStatus = response.data.status;
-
-                        if (response.data.status === 'completed') {
-                            // Sync completed
-                            this.syncSuccess = response.data.success;
-
-                            // Stop timer
-                            this.stopSyncTimer();
-
-                            // Mark source as not syncing
-                            const sourceIndex = this.sources.findIndex(s => s.id === this.currentSource.id);
-                            if (sourceIndex !== -1) {
-                                this.sources[sourceIndex].syncInProgress = false;
-                            }
-
-                            // Refresh sources to get updated data
-                            this.fetchSources();
-                        } else if (response.data.status === 'in_progress' || response.data.status === 'queued') {
-                            // Continue polling
-                            setTimeout(() => this.checkSyncStatus(), 2000);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error checking sync status:', error);
-                        this.syncStatus = 'error';
-                        this.syncErrorMessage = error.response?.data?.error || 'Failed to check sync status.';
-
-                        // Mark source as not syncing
-                        const sourceIndex = this.sources.findIndex(s => s.id === this.currentSource.id);
-                        if (sourceIndex !== -1) {
-                            this.sources[sourceIndex].syncInProgress = false;
-                        }
-
-                        // Stop timer
-                        this.stopSyncTimer();
-                    });
-            },
-
-            startSyncTimer() {
-                // Clear any existing timer
-                this.stopSyncTimer();
-
-                // Start a new timer that updates every second
-                this.syncTimer = setInterval(() => this.updateElapsedTime(), 1000);
-            },
-
-            stopSyncTimer() {
-                if (this.syncTimer) {
-                    clearInterval(this.syncTimer);
-                    this.syncTimer = null;
-                }
-            },
-
-            updateElapsedTime() {
-                if (!this.syncStartTime) return;
-
-                const now = new Date();
-                const elapsed = Math.floor((now - this.syncStartTime) / 1000); // in seconds
-
-                const hours = Math.floor(elapsed / 3600);
-                const minutes = Math.floor((elapsed % 3600) / 60);
-                const seconds = elapsed % 60;
-
-                this.syncElapsedTime = 
-                    String(hours).padStart(2, '0') + ':' + 
-                    String(minutes).padStart(2, '0') + ':' + 
-                    String(seconds).padStart(2, '0');
-            },
-
-            resetSyncState() {
-                this.syncStatus = null;
-                this.syncSuccess = false;
-                this.syncJobId = null;
-                this.syncStartTime = null;
-                this.syncElapsedTime = '00:00:00';
-                this.syncErrorMessage = null;
-                this.stopSyncTimer();
-            },
             showAddModal() {
                 this.editMode = false;
-                this.currentSource = {
+                this.currentProvider = {
                     id: null,
                     name: '',
                     url: ''
                 };
                 this.formError = null;
-                this.sourceModal.show();
+                this.providerModal.show();
             },
-            showEditModal(source) {
+            showEditModal(provider) {
                 this.editMode = true;
-                this.currentSource = {
-                    id: source.id,
-                    name: source.name,
-                    url: source.url
+                this.currentProvider = {
+                    id: provider.id,
+                    name: provider.name,
+                    url: provider.url
                 };
                 this.formError = null;
-                this.sourceModal.show();
+                this.providerModal.show();
             },
-            saveSource() {
+            saveProvider() {
                 this.formSubmitting = true;
                 this.formError = null;
 
                 const payload = {
-                    name: this.currentSource.name,
-                    url: this.currentSource.url
+                    name: this.currentProvider.name,
+                    url: this.currentProvider.url
                 }
 
                 const request = this.editMode
-                    ? axios.patch(`/api/sources/${this.currentSource.id}/`, payload)
-                    : axios.post('/api/sources/', payload);
+                    ? axios.patch(`/api/providers/${this.currentProvider.id}/`, payload)
+                    : axios.post('/api/providers/', payload);
 
                 request
                     .then(() => {
-                        this.sourceModal.hide();
-                        this.fetchSources();
+                        this.providerModal.hide();
+                        this.fetchProviders();
                         this.formSubmitting = false;
                     })
                     .catch(error => {
@@ -704,46 +748,46 @@
                     });
             },
 
-            toggleSourceEnabled(source) {
-                axios.patch(`/api/sources/${source.id}/`, {
-                    is_enabled: source.is_enabled
+            toggleProviderEnabled(provider) {
+                axios.patch(`/api/providers/${provider.id}/`, {
+                    is_enabled: provider.is_enabled
                 })
                 .then(() => {
-                    console.log(`Service provider ${source.id} ${source.is_enabled ? 'enabled' : 'disabled'}`);
-                    // Refresh the sources to update the "Updated" timestamp
-                    this.fetchSources();
+                    console.log(`Service provider ${provider.id} ${provider.is_enabled ? 'enabled' : 'disabled'}`);
+                    // Refresh the providers to update the "Updated" timestamp
+                    this.fetchProviders();
                 })
                 .catch(error => {
                     console.error('Error toggling service provider enabled state:', error);
                     // Revert the toggle if there was an error
-                    source.is_enabled = !source.is_enabled;
+                    provider.is_enabled = !provider.is_enabled;
                     this.$forceUpdate();
                     alert('Failed to update service provider status. Please try again.');
                 });
             },
-            confirmDelete(source) {
-                this.currentSource = {
-                    id: source.id,
-                    name: source.name,
-                    url: source.url
+            confirmDelete(provider) {
+                this.currentProvider = {
+                    id: provider.id,
+                    name: provider.name,
+                    url: provider.url
                 };
                 this.deleteModal.show();
             },
-            deleteSource() {
+            deleteProvider() {
                 this.formSubmitting = true;
 
-                axios.delete(`/api/sources/${this.currentSource.id}/`)
+                axios.delete(`/api/providers/${this.currentProvider.id}/`)
                     .then(() => {
                         this.deleteModal.hide();
-                        this.fetchSources();
+                        this.fetchProviders();
                         this.formSubmitting = false;
                     })
                     .catch(error => {
-                        console.error('Error deleting source:', error);
+                        console.error('Error deleting provider:', error);
                         this.formSubmitting = false;
                         // Show error in delete modal
                         document.querySelector('#deleteModal .modal-body').innerHTML += 
-                            `<div class="alert alert-danger mt-3">Failed to delete playlist source. Please try again later.</div>`;
+                            `<div class="alert alert-danger mt-3">Failed to delete provider. Please try again later.</div>`;
                     });
             },
             formatDate(dateString) {
@@ -976,28 +1020,6 @@
                 this.onSettingsChange();
             },
 
-            addQuickSchedule(type) {
-                let daysOfWeek = [];
-                const time = '12:00';
-
-                // Set days based on selection type
-                if (type === 'all') {
-                    daysOfWeek = [...this.daysOfWeek]; // All days
-                } else if (type === 'weekdays') {
-                    daysOfWeek = this.daysOfWeek.slice(0, 5); // Monday to Friday
-                } else if (type === 'weekend') {
-                    daysOfWeek = this.daysOfWeek.slice(5, 7); // Saturday and Sunday
-                }
-
-                // Add the new schedule
-                this.settings.sync_schedules.push({
-                    daysOfWeek,
-                    time
-                });
-
-                this.onSettingsChange();
-            },
-
             applyQuickSchedule(scheduleIndex, type) {
                 // Get the schedule at the specified index
                 const schedule = this.settings.sync_schedules[scheduleIndex];
@@ -1015,12 +1037,12 @@
             },
 
             // Channel list methods
-            showChannelsModal(source) {
-                // Set current source
-                this.currentSource = {
-                    id: source.id,
-                    name: source.name,
-                    url: source.url
+            showChannelsModal(provider) {
+                // Set current provider
+                this.currentProvider = {
+                    id: provider.id,
+                    name: provider.name,
+                    url: provider.url
                 };
 
                 // Reset channels data
@@ -1041,7 +1063,7 @@
                 this.channelsError = null;
 
                 // Fetch channels for the specified page
-                axios.get(`/api/sources/${this.currentSource.id}/channels/`, {
+                axios.get(`/api/providers/${this.currentProvider.id}/channels/`, {
                     params: {
                         page: page,
                         size: this.channelsPageSize
@@ -1089,7 +1111,150 @@
                         console.error('Failed to copy URL:', err);
                         alert('Failed to copy URL. Please try again.');
                     });
-            }
+            },
+
+            // Job History Methods
+            showJobHistoryModal(provider) {
+                // Set current provider
+                this.currentProvider = provider;
+
+                // Reset jobs data
+                this.jobs = [];
+                this.jobsCurrentPage = 1;
+                this.jobsTotalPages = 1;
+                this.jobsError = null;
+
+                // Show modal
+                this.jobHistoryModal.show();
+
+                // Load first page of jobs
+                this.loadJobsPage(1);
+            },
+
+            loadJobsPage(page) {
+                if (!this.jobHistoryModal._isShown) return;
+
+                this.jobsLoading = true;
+                this.jobsError = null;
+
+                // Fetch jobs for the specified page
+                axios.get(`/api/providers/${this.currentProvider.id}/jobs/`, {
+                    params: {
+                        page: page,
+                        size: this.jobsPageSize
+                    }
+                })
+                .then(response => {
+                    // Update jobs data
+                    this.jobs = response.data.items;
+                    this.jobsCurrentPage = response.data.page;
+                    this.jobsTotalPages = Math.ceil(response.data.total / this.jobsPageSize);
+                    this.jobsLoading = false;
+                })
+                .catch(error => {
+                    console.error('Error fetching jobs:', error);
+                    this.jobsError = 'Failed to load sync history. Please try again.';
+                    this.jobsLoading = false;
+                });
+            },
+
+            syncProviderFromHistory() {
+                // Start sync
+                axios.post(`/api/providers/${this.currentProvider.id}/sync/`)
+                    .then(response => {
+                        console.log('Sync initiated from history modal:', response.data);
+
+                        this.currentProvider.active_job_id = response.data.job_id;
+                    })
+                    .catch(error => {
+                        console.error('Error initiating sync from history modal:', error);
+
+                        this.jobsError = error.response?.data?.error || 'Failed to initiate sync. Please try again.';
+                    });
+            },
+
+            // WebSocket methods
+            connectToActiveJobsWebSocket() {
+                // Close existing connection if any
+                if (this.activeJobsSocket) {
+                    this.activeJobsSocket.close();
+                }
+
+                // Create a new WebSocket connection
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/active-jobs/`;
+
+                this.activeJobsSocket = new WebSocket(wsUrl);
+
+                // Set up event handlers
+                this.activeJobsSocket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+
+                    if (data.type === 'active_jobs_update') {
+                        // Update providers with active job information
+                        this.updateProvidersWithActiveJobs(data.active_jobs);
+                    }
+                };
+
+                this.activeJobsSocket.onclose = () => {
+                    console.log('Active jobs WebSocket connection closed');
+                    // Try to reconnect after a delay
+                    setTimeout(() => this.connectToActiveJobsWebSocket(), 5000);
+                };
+
+                this.activeJobsSocket.onerror = (error) => {
+                    console.error('Active jobs WebSocket error:', error);
+                };
+            },
+
+            disconnectWebSockets() {
+                // Close active jobs WebSocket
+                if (this.activeJobsSocket) {
+                    this.activeJobsSocket.close();
+                    this.activeJobsSocket = null;
+                }
+            },
+
+            updateProvidersWithActiveJobs(activeJobs) {
+                // Create a map of provider IDs to active job IDs
+                const providerActiveJobs = {};
+                activeJobs.forEach(activeJob => {
+                    providerActiveJobs[activeJob.provider_id] = activeJob.job;
+                });
+
+                // Update each provider
+                let updateHistoryModal = false;
+                this.providers.forEach(provider => {
+                    const currentActiveJob = providerActiveJobs[provider.id];
+                    const previousActiveJob = this.activeJobs.find(j => j.job_id === provider.active_job_id);
+
+                    // If the provider has an active job
+                    if (currentActiveJob) {
+                        provider.active_job_id = currentActiveJob.job_id;
+
+                        if (currentActiveJob.job_id !== previousActiveJob?.job_id) updateHistoryModal = true;
+                    } else {
+                        provider.active_job_id = null;
+
+                        if (previousActiveJob) {
+                            updateHistoryModal = true;
+
+                            this.fetchProvider(provider.id);
+                        }
+                    }
+                });
+
+                // Set active jobs
+                this.activeJobs = Object.values(providerActiveJobs);
+
+                if(updateHistoryModal) {
+                    // Refresh the history section
+                    this.loadJobsPage(this.jobsCurrentPage);
+                }
+
+                // Force Vue to update the UI
+                this.$forceUpdate();
+            },
         }
     });
 </script>

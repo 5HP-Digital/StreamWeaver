@@ -8,8 +8,8 @@ def index(request):
     return render(request, 'home/index.html')
 
 
-def iptv(request):
+def providers(request):
     """
-    View for the IPTV page
+    View for the Providers page
     """
-    return render(request, 'home/iptv.html')
+    return render(request, 'home/providers.html')

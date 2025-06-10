@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     'channels',
     # Local apps
     'home',
-    'playlist_manager',
+    'provider_manager',
 ]
 
 MIDDLEWARE = [
