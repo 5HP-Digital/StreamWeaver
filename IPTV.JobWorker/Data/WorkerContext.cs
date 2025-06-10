@@ -43,6 +43,7 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
                 .HasColumnType("varchar(20)")
                 .IsRequired()
                 .HasDefaultValueSql("Queued")
+                .HasSentinel(JobState.Queued)
                 .HasConversion<EnumToStringConverter<JobState>>();
 
             builder.Property(e => e.StatusDescription)

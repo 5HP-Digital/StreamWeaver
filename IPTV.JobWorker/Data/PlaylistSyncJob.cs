@@ -6,7 +6,7 @@ public class PlaylistSyncJob : ITimestampable
 
     public Guid JobId { get; set; }
 
-    public JobState State { get; set; }
+    public JobState State { get; set; } = JobState.Queued;
     
     public string? StatusDescription { get; set; }
 
