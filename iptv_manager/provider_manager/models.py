@@ -6,7 +6,6 @@ import uuid
 class JobState(models.TextChoices):
     """
     Enum representing the state of a job.
-    Based on IPTV.JobWorker/Data/JobState.cs
     """
     QUEUED = 'Queued'
     IN_PROGRESS = 'InProgress'
@@ -17,7 +16,6 @@ class JobState(models.TextChoices):
 class Provider(models.Model):
     """
     Model representing a provider.
-    Based on IPTV.PlaylistManager/Data/PlaylistSource.cs
     """
     name = models.CharField(max_length=255)
     url = models.TextField(validators=[URLValidator()])
@@ -32,7 +30,6 @@ class Provider(models.Model):
 class ProviderSyncJob(models.Model):
     """
     Model representing a job.
-    Based on IPTV.JobWorker/Data/Job.cs
     """
     job_id = models.UUIDField(default=uuid.uuid4, unique=True)
     state = models.CharField(
@@ -60,7 +57,6 @@ class ProviderSyncJob(models.Model):
 class ProviderChannel(models.Model):
     """
     Model representing a channel within a provider.
-    Based on IPTV.PlaylistManager/Data/PlaylistSourceChannel.cs
     """
     provider = models.ForeignKey(
         Provider, 
