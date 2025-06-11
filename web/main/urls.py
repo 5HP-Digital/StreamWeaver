@@ -10,5 +10,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('home.api.urls')),
     path('api/', include('provider_manager.urls')),
+    path('api/', include('playlist_manager.urls')),
     path('', include('home.urls')),
 ]
