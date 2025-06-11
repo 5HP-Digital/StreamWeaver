@@ -5,7 +5,7 @@ namespace IPTV.JobWorker.Data;
 
 public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, TimeProvider timeProvider) : DbContext
 {
-    public DbSet<PlaylistSyncJob> Jobs { get; set; }
+    public DbSet<ProviderSyncJob> Jobs { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -23,11 +23,11 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
     {
         base.OnModelCreating(modelBuilder);
 
-        // Job
-        modelBuilder.Entity<PlaylistSyncJob>(builder =>
+        // ProviderSyncJob
+        modelBuilder.Entity<ProviderSyncJob>(builder =>
         {
             // Table
-            builder.ToTable("playlist_manager_playlistsyncjob");
+            builder.ToTable("provider_manager_providersyncjob");
             builder.HasKey(e => e.Id);
 
             // Properties
@@ -70,22 +70,22 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
                 .IsRequired();
 
             // Relationships
-            builder.HasOne(e => e.Source)
+            builder.HasOne(e => e.Provider)
                 .WithMany(e => e.Jobs)
                 .IsRequired()
-                .HasForeignKey("source_id")
+                .HasForeignKey("provider_id")
                 .OnDelete(DeleteBehavior.Cascade);
             
             // Indexes
-            builder.HasIndex(nameof(PlaylistSyncJob.JobId))
+            builder.HasIndex(nameof(ProviderSyncJob.JobId))
                 .IsUnique();
         });
 
-        // PlaylistSource
-        modelBuilder.Entity<PlaylistSource>(builder =>
+        // Provider
+        modelBuilder.Entity<Provider>(builder =>
         {
             // Table
-            builder.ToTable("playlist_manager_playlistsource");
+            builder.ToTable("provider_manager_provider");
             builder.HasKey(e => e.Id);
 
             // Properties
@@ -108,19 +108,19 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
             // Relationships
             builder.HasMany(e => e.Channels)
                 .WithOne()
-                .HasForeignKey("source_id")
+                .HasForeignKey("provider_id")
                 .OnDelete(DeleteBehavior.Cascade);
             builder.HasMany(e => e.Jobs)
-                .WithOne(e => e.Source)
-                .HasForeignKey("source_id")
+                .WithOne(e => e.Provider)
+                .HasForeignKey("provider_id")
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // PlaylistSourceChannel
-        modelBuilder.Entity<PlaylistSourceChannel>(builder =>
+        // ProviderChannel
+        modelBuilder.Entity<ProviderChannel>(builder =>
         {
             // Table
-            builder.ToTable("playlist_manager_playlistsourcechannel");
+            builder.ToTable("provider_manager_providerchannel");
             builder.HasKey(e => e.Id);
 
             // Properties

@@ -5,39 +5,39 @@ using IPTV.JobWorker.Data;
 
 namespace IPTV.JobWorker.Services;
 
-public class PlaylistSynchronizer(
+public class ProviderSynchronizer(
     WorkerContext workerContext, 
     IHttpClientFactory httpClientFactory, 
-    ILogger<PlaylistSynchronizer> logger)
+    ILogger<ProviderSynchronizer> logger)
 {
-    public async Task<(bool, string?)> Run(PlaylistSource source, bool allowChannelAutoDeletion, CancellationToken cancellationToken)
+    public async Task<(bool, string?)> Run(Provider provider, bool allowChannelAutoDeletion, CancellationToken cancellationToken)
     {
-        if (!source.IsEnabled)
+        if (!provider.IsEnabled)
         {
-            logger.LogWarning("PlaylistSource with ID {SourceId} is not enabled", source.Id);
+            logger.LogWarning("Provider with ID {ProviderId} is not enabled", provider.Id);
             
             return (false, "Service provider is not enabled");
         }
 
-        var client = httpClientFactory.CreateClient(nameof(PlaylistSynchronizer));
+        var client = httpClientFactory.CreateClient(nameof(ProviderSynchronizer));
 
-        // Retrieve and deserialize playlist
+        // Retrieve and deserialize m3u file
         Document document;
-        await using (var stream = await client.GetStreamAsync(source.Url, cancellationToken))
+        await using (var stream = await client.GetStreamAsync(provider.Url, cancellationToken))
         {
             document = await Serializer.DeserializeAsync(stream, cancellationToken);
         }
         
-        logger.LogInformation("Playlist with {ChannelCount} channels retrieved from {SourceUrl}", document.Channels.Count, source.Url);
+        logger.LogInformation("Document with {ChannelCount} channels retrieved from {ProviderUrl}", document.Channels.Count, provider.Url);
         
-        // Index existing channels for the playlist source)
-        var existingChannels = new HybridDictionary(source.Channels.Count);
-        foreach (var channel in source.Channels)
+        // Index existing channels for the provider
+        var existingChannels = new HybridDictionary(provider.Channels.Count);
+        foreach (var channel in provider.Channels)
         {
             existingChannels.Add((channel.Title, channel.Group), channel);
         }
         
-        logger.LogInformation("{ChannelCount} existing channels indexed", source.Channels.Count);
+        logger.LogInformation("{ChannelCount} existing channels indexed", provider.Channels.Count);
         
         // Track which channels were processed
         var processedChannels = new HashSet<(string Title, string? Group)>();
@@ -62,7 +62,7 @@ public class PlaylistSynchronizer(
             if (existingChannels.Contains(key))
             {
                 // Update existing channel
-                var channelToUpdate = (PlaylistSourceChannel)existingChannels[key]!;
+                var channelToUpdate = (ProviderChannel)existingChannels[key]!;
                 channelToUpdate.Title = channel.Title;
                 channelToUpdate.TvgId = channel.TvgId;
                 channelToUpdate.MediaUrl = channel.MediaUrl;
@@ -75,7 +75,7 @@ public class PlaylistSynchronizer(
             else
             {
                 // Create a new channel
-                source.Channels.Add(new PlaylistSourceChannel
+                provider.Channels.Add(new ProviderChannel
                 {
                     Title = channel.Title,
                     TvgId = channel.TvgId,
@@ -98,14 +98,14 @@ public class PlaylistSynchronizer(
         var deleted = 0;
         foreach (var channel in from DictionaryEntry entry in existingChannels 
                  let key = ((string Title, string? Group))entry.Key 
-                 let channel = (PlaylistSourceChannel)entry.Value! 
+                 let channel = (ProviderChannel)entry.Value! 
                  where !processedChannels.Contains(key) 
                  select channel)
         {
             if (allowChannelAutoDeletion)
             {
                 // Delete channel
-                source.Channels.Remove(channel);
+                provider.Channels.Remove(channel);
             }
             else
             {

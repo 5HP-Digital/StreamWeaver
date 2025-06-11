@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace IPTV.JobWorker;
 
-public class PlaylistSyncJobQueueWorker(
-    ILogger<PlaylistSyncJobQueueWorker> logger, 
+public class ProviderSyncJobQueueWorker(
+    ILogger<ProviderSyncJobQueueWorker> logger, 
     IServiceProvider serviceProvider, 
     TimeProvider timeProvider) 
     : BackgroundService
@@ -20,18 +20,18 @@ public class PlaylistSyncJobQueueWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Playlist sync worker starting");
+        logger.LogInformation("Provider sync worker starting");
         
         while (await _timer.WaitForNextTickAsync(cancellationToken: stoppingToken))
         {
             try
             {
-                logger.LogInformation("Playlist sync worker running at: {time}", timeProvider.GetUtcNow());
+                logger.LogInformation("Provider sync worker running at: {time}", timeProvider.GetUtcNow());
 
                 await using var scope = serviceProvider.CreateAsyncScope();
                 await using var workerContext = scope.ServiceProvider.GetRequiredService<WorkerContext>();
 
-                var job = await workerContext.Jobs.Include(j => j.Source)
+                var job = await workerContext.Jobs.Include(j => j.Provider)
                     .Where(j => j.State == JobState.Queued)
                     .OrderBy(j => j.CreatedAt)
                     .FirstOrDefaultAsync(cancellationToken: stoppingToken);
@@ -56,8 +56,8 @@ public class PlaylistSyncJobQueueWorker(
 
                     var start = timeProvider.GetTimestamp();
                     
-                    var playlistSynchronizer = scope.ServiceProvider.GetRequiredService<PlaylistSynchronizer>();
-                    var (success, description) = await playlistSynchronizer.Run(job.Source, job.AllowChannelAutoDeletion, cancellationToken: stoppingToken);
+                    var providerSynchronizer = scope.ServiceProvider.GetRequiredService<ProviderSynchronizer>();
+                    var (success, description) = await providerSynchronizer.Run(job.Provider, job.AllowChannelAutoDeletion, cancellationToken: stoppingToken);
 
                     // retry on exception only, graceful unsuccessful processing fails the job
                     job.State = success ? JobState.Completed : JobState.Failed;
@@ -95,7 +95,7 @@ public class PlaylistSyncJobQueueWorker(
             }
         }
         
-        logger.LogInformation("Playlist sync worker stopping");
+        logger.LogInformation("Provider sync worker stopping");
     }
     
     public override async Task StopAsync(CancellationToken cancellationToken)

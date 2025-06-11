@@ -1,6 +1,6 @@
 ﻿namespace IPTV.JobWorker.Data;
 
-public class PlaylistSyncJob : ITimestampable
+public class ProviderSyncJob : ITimestampable
 {
     public long Id { get; set; }
 
@@ -22,5 +22,5 @@ public class PlaylistSyncJob : ITimestampable
 
     public DateTime UpdatedAt { get; set; }
 
-    public virtual required PlaylistSource Source { get; set; }
+    public virtual required Provider Provider { get; set; }
 }

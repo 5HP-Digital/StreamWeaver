@@ -12,10 +12,10 @@ builder.Services.AddSingleton(TimeProvider.System);
 // Sqlite
 builder.Services.AddDbContext<WorkerContext>();
 
-builder.Services.AddScoped<PlaylistSynchronizer>();
-builder.Services.AddHostedService<PlaylistSyncJobQueueWorker>();
+builder.Services.AddScoped<ProviderSynchronizer>();
+builder.Services.AddHostedService<ProviderSyncJobQueueWorker>();
 
-builder.Services.AddHttpClient(nameof(PlaylistSynchronizer),
+builder.Services.AddHttpClient(nameof(ProviderSynchronizer),
     client =>
     {
         client.Timeout = TimeSpan.FromMinutes(5);
