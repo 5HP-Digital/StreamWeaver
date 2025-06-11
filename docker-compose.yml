@@ -3,7 +3,6 @@
   web:
     build:
       context: ./iptv_manager
-      dockerfile: web.Dockerfile
     restart: always
     ports:
       - "8000:8000"
@@ -15,7 +14,6 @@
   job-worker:
     build:
       context: ./IPTV.JobWorker
-      dockerfile: Dockerfile
     restart: always
     environment:
       - DOTNET_ENVIRONMENT=Development
@@ -27,7 +25,7 @@
   migration:
     build:
       context: ./iptv_manager
-      dockerfile: web.Dockerfile
+      dockerfile: Dockerfile
     volumes:
       - ./config:/config
     command: python manage.py migrate
