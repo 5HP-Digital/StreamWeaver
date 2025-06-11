@@ -50,7 +50,7 @@ Thumbs.db
 config/
 
 # Static files
-iptv_manager/staticfiles/
+web/staticfiles/
 
 ## C-Sharp
 

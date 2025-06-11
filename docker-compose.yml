@@ -2,7 +2,7 @@
 
   web:
     build:
-      context: ./iptv_manager
+      context: ./web
     restart: always
     ports:
       - "8000:8000"
@@ -24,7 +24,7 @@
 
   migration:
     build:
-      context: ./iptv_manager
+      context: ./web
       dockerfile: Dockerfile
     volumes:
       - ./config:/config

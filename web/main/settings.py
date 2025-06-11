@@ -1,5 +1,5 @@
 ﻿"""
-Django settings for iptv_manager project.
+Django settings for web project.
 """
 
 import os
@@ -54,7 +54,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'iptv_manager.urls'
+ROOT_URLCONF = 'main.urls'
 
 TEMPLATES = [
     {
@@ -72,8 +72,8 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'iptv_manager.wsgi.application'
-ASGI_APPLICATION = 'iptv_manager.asgi.application'
+WSGI_APPLICATION = 'main.wsgi.application'
+ASGI_APPLICATION = 'main.asgi.application'
 
 # Database
 DATABASES = {

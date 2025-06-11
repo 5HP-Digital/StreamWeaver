@@ -80,4 +80,4 @@ HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=10s \
 USER ${USER}
 
 # Run the application
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "iptv_manager.asgi:application"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "main.asgi:application"]

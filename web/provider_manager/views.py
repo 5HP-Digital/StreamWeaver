@@ -12,7 +12,7 @@ from .serializers import (
     ProviderChannelSerializer,
     ProviderSyncJobSerializer
 )
-from iptv_manager.utils import ConfigStore
+from main.utils import ConfigStore
 
 class ProvidersViewSet(viewsets.ViewSet):
     """

@@ -1,5 +1,5 @@
 ﻿"""
-URL configuration for iptv_manager project.
+URL configuration for web project.
 """
 from django.contrib import admin
 from django.urls import path, include, re_path
