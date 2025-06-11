@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     # Local apps
     'home',
     'provider_manager',
+    'playlist_manager',
 ]
 
 MIDDLEWARE = [
