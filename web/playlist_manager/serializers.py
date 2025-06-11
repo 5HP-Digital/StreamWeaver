@@ -8,10 +8,18 @@ class PlaylistSerializer(serializers.ModelSerializer):
     """
     Serializer for Playlist model.
     """
+    channel_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Playlist
-        fields = ['id', 'name', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'created_at', 'updated_at', 'channel_count']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'channel_count']
+
+        def get_channel_count(self, obj):
+            """
+            Get the number of channels associated with this Playlist.
+            """
+            return obj.channels.count()
 
 
 class PlaylistCreateSerializer(serializers.ModelSerializer):
