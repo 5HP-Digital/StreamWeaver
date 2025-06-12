@@ -29,6 +29,7 @@ class PlaylistChannel(models.Model):
     Model representing a channel within a playlist.
     """
     title = models.CharField(max_length=255, null=True, blank=True)
+    tvg_id = models.CharField(max_length=255, null=True, blank=True)
     logo_url = models.TextField(validators=[URLValidator()], null=True, blank=True)
     category = models.CharField(max_length=255, null=True, blank=True)
     order = models.IntegerField()

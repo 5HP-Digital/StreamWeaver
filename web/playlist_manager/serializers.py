@@ -111,7 +111,7 @@ class PlaylistChannelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PlaylistChannel
-        fields = ['id', 'title', 'category', 'logo_url', 'provider_channel', 'created_at', 'updated_at']
+        fields = ['id', 'title', 'tvg_id', 'category', 'logo_url', 'provider_channel', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
@@ -124,11 +124,16 @@ class PlaylistChannelCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PlaylistChannel
-        fields = ['title', 'category', 'logo_url', 'provider_channel_id']
+        fields = ['title', 'tvg_id', 'category', 'logo_url', 'provider_channel_id']
 
     def validate_title(self, value):
         if not value.strip():
             raise serializers.ValidationError("Title cannot be empty.")
+        return value
+
+    def validate_tvg_id(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("TVG ID cannot be empty.")
         return value
 
     def validate_provider_channel_id(self, value):
@@ -148,11 +153,16 @@ class PlaylistChannelUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PlaylistChannel
-        fields = ['title', 'category', 'logo_url', 'provider_channel_id']
+        fields = ['title', 'tvg_id', 'category', 'logo_url', 'provider_channel_id']
 
     def validate_title(self, value):
         if not value.strip():
             raise serializers.ValidationError("Title cannot be empty.")
+        return value
+
+    def validate_tvg_id(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("TVG ID cannot be empty.")
         return value
 
     def validate_provider_channel_id(self, value):
