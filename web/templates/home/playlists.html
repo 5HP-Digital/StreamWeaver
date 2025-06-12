@@ -94,6 +94,9 @@
                         <button class="btn btn-sm btn-danger" @click="confirmDelete(playlist)">
                             <i class="bi bi-trash"></i> Delete
                         </button>
+                        <button class="btn btn-sm btn-info" @click="goToChannelEditor(playlist)">
+                            <i class="bi bi-gear"></i> Channel Editor
+                        </button>
                     </div>
                 </div>
             </div>
@@ -440,6 +443,10 @@
                 if (!dateString) return 'N/A';
                 const date = new Date(dateString);
                 return date.toLocaleString();
+            },
+            goToChannelEditor(playlist) {
+                // Navigate to the channel editor page for the selected playlist
+                window.location.href = `/playlists/${playlist.id}/editor`;
             }
         }
     });

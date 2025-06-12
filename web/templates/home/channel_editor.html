@@ -1,0 +1,383 @@
+﻿{% extends 'base.html' %}
+
+{% block extra_head %}
+<style>
+    .channel-logo {
+        max-width: 40px;
+        max-height: 40px;
+        margin-right: 10px;
+    }
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+    .inactive-channel {
+        background-color: #fff3cd;
+    }
+    .reorder-handle {
+        cursor: move;
+    }
+    .order-controls {
+        display: flex;
+        align-items: center;
+    }
+    .order-controls i {
+        cursor: pointer;
+        margin: 0 5px;
+    }
+    .page-size-selector {
+        margin-bottom: 20px;
+    }
+    .warning-icon {
+        color: #ffc107;
+        margin-left: 5px;
+    }
+    .channel-info-popover {
+        max-width: 300px;
+    }
+    .channel-info-thumbnail {
+        max-width: 60px;
+        max-height: 60px;
+        margin-bottom: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="app">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <a href="/playlists/" class="btn btn-secondary me-2">
+                <i class="bi bi-arrow-left"></i> Back to Playlists
+            </a>
+            <h1 class="h2 d-inline-block">[[ playlistName ]] - Channel Editor</h1>
+        </div>
+    </div>
+
+    <div class="alert alert-info" v-if="loading">
+        <div class="spinner-border spinner-border-sm" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading channels...
+    </div>
+
+    <div class="alert alert-danger" v-if="error">
+        [[ error ]]
+    </div>
+
+    <div v-if="!loading && !error">
+        <div v-if="channels.length === 0" class="alert alert-warning">
+            No channels found for this playlist.
+        </div>
+
+        <div v-else>
+            <!-- Page size selector -->
+            <div class="page-size-selector">
+                <label for="pageSize" class="form-label">Items per page:</label>
+                <select id="pageSize" class="form-select form-select-sm d-inline-block w-auto" v-model="pageSize" @change="onPageSizeChange">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Logo</th>
+                            <th>Title</th>
+                            <th>TVG ID</th>
+                            <th>Category</th>
+                            <th>Channel</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="channelsTableBody">
+                        <tr v-for="channel in channels" :key="channel.id" :class="{'inactive-channel': channel.provider_channel && !channel.provider_channel.is_active}">
+                            <td>
+                                <div class="order-controls">
+                                    <i class="bi bi-arrow-up" @click="moveChannelUp(channel)" title="Move Up"></i>
+                                    <i class="bi bi-grip-vertical reorder-handle" title="Drag to Reorder"></i>
+                                    <i class="bi bi-arrow-down" @click="moveChannelDown(channel)" title="Move Down"></i>
+                                </div>
+                            </td>
+                            <td>
+                                <img v-if="channel.logo_url || (channel.provider_channel && channel.provider_channel.logo_url)" 
+                                     :src="channel.logo_url || (channel.provider_channel ? channel.provider_channel.logo_url : '')" 
+                                     class="channel-logo" 
+                                     @error="handleLogoError">
+                            </td>
+                            <td>[[ channel.title || (channel.provider_channel ? channel.provider_channel.title : '') ]]</td>
+                            <td>[[ channel.tvg_id || (channel.provider_channel ? channel.provider_channel.tvg_id : '') ]]</td>
+                            <td>[[ channel.category ]]</td>
+                            <td @click="showChannelDetails(channel, $event)" style="cursor: pointer;">
+                                <span v-if="channel.provider_channel">[[ channel.provider_channel.title ]]</span>
+                                <span v-else>-</span>
+                            </td>
+                            <td>
+                                <!-- Actions will be added later -->
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination-container" v-if="totalPages > 1">
+                <nav aria-label="Channel list pagination">
+                    <ul class="pagination">
+                        <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                            <a class="page-link" href="#" @click.prevent="loadPage(1)">First</a>
+                        </li>
+                        <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                            <a class="page-link" href="#" @click.prevent="loadPage(currentPage - 1)">Previous</a>
+                        </li>
+
+                        <li v-for="page in paginationPages" :key="page" class="page-item" :class="{ active: currentPage === page }">
+                            <a class="page-link" href="#" @click.prevent="loadPage(page)">[[ page ]]</a>
+                        </li>
+
+                        <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                            <a class="page-link" href="#" @click.prevent="loadPage(currentPage + 1)">Next</a>
+                        </li>
+                        <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                            <a class="page-link" href="#" @click.prevent="loadPage(totalPages)">Last</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Channel Details Popover Template -->
+    <div class="d-none">
+        <div id="channelDetailsTemplate" class="channel-info-popover">
+            <div v-if="selectedChannel && selectedChannel.provider_channel">
+                <img v-if="selectedChannel.provider_channel.logo_url" 
+                     :src="selectedChannel.provider_channel.logo_url" 
+                     class="channel-info-thumbnail" 
+                     @error="handleLogoError">
+                <p><strong>Title:</strong> [[ selectedChannel.provider_channel.title ]]</p>
+                <p><strong>TVG ID:</strong> [[ selectedChannel.provider_channel.tvg_id ]]</p>
+                <p><strong>Group:</strong> [[ selectedChannel.provider_channel.group ]]</p>
+                <p>
+                    <strong>Provider:</strong> 
+                    [[ selectedChannel.provider_channel.provider.name ]]
+                    <i v-if="selectedChannel.provider_channel.provider && !selectedChannel.provider_channel.provider.is_enabled" 
+                       class="bi bi-exclamation-triangle-fill warning-icon" 
+                       title="Provider is disabled"></i>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Create Vue app
+    const app = new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            playlistId: "{{ playlist_id }}",
+            playlistName: '',
+            channels: [],
+            loading: true,
+            error: null,
+            currentPage: 1,
+            totalPages: 1,
+            pageSize: 10,
+            sortable: null,
+            selectedChannel: null,
+            popover: null
+        },
+        mounted() {
+            this.fetchPlaylist();
+            this.loadPage(1);
+            
+            // Initialize Sortable.js after the DOM is updated
+            this.$nextTick(() => {
+                this.initSortable();
+            });
+        },
+        computed: {
+            paginationPages() {
+                // Generate an array of page numbers to display in pagination
+                // Show at most 5 pages, centered around the current page
+                const totalPages = this.totalPages;
+                const currentPage = this.currentPage;
+
+                if (totalPages <= 5) {
+                    // If there are 5 or fewer pages, show all of them
+                    return Array.from({ length: totalPages }, (_, i) => i + 1);
+                } else {
+                    // Otherwise, show 5 pages centered around the current page
+                    let startPage = Math.max(currentPage - 2, 1);
+                    let endPage = startPage + 4;
+
+                    if (endPage > totalPages) {
+                        endPage = totalPages;
+                        startPage = Math.max(endPage - 4, 1);
+                    }
+
+                    return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+                }
+            }
+        },
+        methods: {
+            fetchPlaylist() {
+                axios.get(`/api/playlists/${this.playlistId}/`)
+                    .then(response => {
+                        this.playlistName = response.data.name;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching playlist:', error);
+                        this.error = 'Failed to load playlist information.';
+                    });
+            },
+            loadPage(page) {
+                this.loading = true;
+                this.error = null;
+
+                // Fetch channels for the specified page
+                axios.get(`/api/playlists/${this.playlistId}/channels/`, {
+                    params: {
+                        page: page,
+                        size: this.pageSize
+                    }
+                })
+                .then(response => {
+                    // Update channels data
+                    this.channels = response.data.items;
+                    this.currentPage = response.data.page;
+                    this.totalPages = Math.ceil(response.data.total / this.pageSize);
+                    this.loading = false;
+                    
+                    // Re-initialize sortable after data is loaded
+                    this.$nextTick(() => {
+                        this.initSortable();
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching channels:', error);
+                    this.error = 'Failed to load channels. Please try again.';
+                    this.loading = false;
+                });
+            },
+            onPageSizeChange() {
+                // Reset to first page when page size changes
+                this.loadPage(1);
+            },
+            initSortable() {
+                const el = document.getElementById('channelsTableBody');
+                if (el) {
+                    this.sortable = new Sortable(el, {
+                        handle: '.reorder-handle',
+                        animation: 150,
+                        onEnd: this.handleDragEnd
+                    });
+                }
+            },
+            handleDragEnd(evt) {
+                const channel = this.channels[evt.oldIndex];
+                const newOrder = evt.newIndex + 1 + (this.currentPage - 1) * this.pageSize;
+                
+                // Update the order in the backend
+                this.updateChannelOrder(channel.id, newOrder);
+                
+                // Reload the current page to reflect the changes
+                this.loadPage(this.currentPage);
+            },
+            updateChannelOrder(channelId, newOrder) {
+                axios.patch(`/api/channels/${channelId}/`, {
+                    order: newOrder
+                })
+                .then(() => {
+                    console.log(`Channel ${channelId} order updated to ${newOrder}`);
+                })
+                .catch(error => {
+                    console.error('Error updating channel order:', error);
+                    this.error = 'Failed to update channel order. Please try again.';
+                });
+            },
+            moveChannelUp(channel) {
+                // Move channel up (decrease order)
+                const currentIndex = this.channels.indexOf(channel);
+                if (currentIndex > 0) {
+                    // If not the first item in the current page
+                    const newOrder = channel.order - 1;
+                    this.updateChannelOrder(channel.id, newOrder);
+                    this.loadPage(this.currentPage);
+                } else if (this.currentPage > 1) {
+                    // If first item in the page and not on the first page, move to previous page
+                    const newOrder = (this.currentPage - 1) * this.pageSize;
+                    this.updateChannelOrder(channel.id, newOrder);
+                    this.loadPage(this.currentPage - 1);
+                }
+            },
+            moveChannelDown(channel) {
+                // Move channel down (increase order)
+                const currentIndex = this.channels.indexOf(channel);
+                if (currentIndex < this.channels.length - 1) {
+                    // If not the last item in the current page
+                    const newOrder = channel.order + 1;
+                    this.updateChannelOrder(channel.id, newOrder);
+                    this.loadPage(this.currentPage);
+                } else if (this.currentPage < this.totalPages) {
+                    // If last item in the page and not on the last page, move to next page
+                    const newOrder = this.currentPage * this.pageSize + 1;
+                    this.updateChannelOrder(channel.id, newOrder);
+                    this.loadPage(this.currentPage + 1);
+                }
+            },
+            showChannelDetails(channel, event) {
+                // Hide any existing popovers
+                if (this.popover) {
+                    this.popover.dispose();
+                }
+                
+                this.selectedChannel = channel;
+                
+                // Use Bootstrap's popover
+                this.$nextTick(() => {
+                    const popoverTrigger = event.currentTarget;
+                    const popoverContent = document.getElementById('channelDetailsTemplate').innerHTML;
+                    
+                    this.popover = new bootstrap.Popover(popoverTrigger, {
+                        html: true,
+                        content: popoverContent,
+                        placement: 'auto',
+                        trigger: 'manual',
+                        container: 'body'
+                    });
+                    
+                    this.popover.show();
+                    
+                    // Add click event to close popover when clicking outside
+                    document.addEventListener('click', this.closePopover);
+                });
+            },
+            closePopover(event) {
+                // Close popover when clicking outside
+                if (this.popover && !event.target.closest('.popover') && 
+                    !event.target.closest('[data-bs-toggle="popover"]')) {
+                    this.popover.dispose();
+                    this.popover = null;
+                    document.removeEventListener('click', this.closePopover);
+                }
+            },
+            handleLogoError(event) {
+                // Replace broken image with a placeholder or hide it
+                event.target.style.display = 'none';
+            }
+        }
+    });
+</script>
+{% endblock %}

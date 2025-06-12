@@ -20,3 +20,10 @@ def playlists(request):
     View for the Playlists page
     """
     return render(request, 'home/playlists.html')
+
+
+def channel_editor(request, playlist_id):
+    """
+    View for the Channel Editor page
+    """
+    return render(request, 'home/channel_editor.html', {'playlist_id': playlist_id})
