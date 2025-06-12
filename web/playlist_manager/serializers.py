@@ -128,10 +128,11 @@ class PlaylistChannelUpdateSerializer(serializers.ModelSerializer):
     """
     title = serializers.CharField(required=False)
     provider_channel_id = serializers.IntegerField(required=False)
+    order = serializers.IntegerField(required=False)
 
     class Meta:
         model = PlaylistChannel
-        fields = ['title', 'tvg_id', 'category', 'logo_url', 'provider_channel_id']
+        fields = ['title', 'tvg_id', 'category', 'logo_url', 'provider_channel_id', 'order']
 
     def validate_title(self, value):
         if not value.strip():
@@ -148,4 +149,17 @@ class PlaylistChannelUpdateSerializer(serializers.ModelSerializer):
             ProviderChannel.objects.get(pk=value)
         except ProviderChannel.DoesNotExist:
             raise serializers.ValidationError("Provider channel does not exist.")
+        return value
+
+    def validate_order(self, value):
+        if value < 1:
+            raise serializers.ValidationError("Order must be greater than 0.")
+
+        playlist_channel = PlaylistChannel.objects.get(pk=self.instance.pk)
+        count = playlist_channel.playlist.channels.count()
+        if count == 1:
+            raise serializers.ValidationError("Cannot reorder the first channel.")
+        if value > count:
+            raise serializers.ValidationError(f"Order must be between 1 and {count}.")
+
         return value

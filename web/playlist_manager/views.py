@@ -11,7 +11,6 @@ from .serializers import (
     PlaylistSerializer,
     PlaylistCreateSerializer,
     PlaylistUpdateSerializer,
-    PlaylistReorderSerializer,
     PlaylistChannelSerializer,
     PlaylistChannelCreateSerializer,
     PlaylistChannelUpdateSerializer
@@ -181,7 +180,7 @@ class ChannelsViewSet(viewsets.ViewSet):
     """
     API endpoint for playlist channels.
     """
-
+    @transaction.atomic
     def partial_update(self, request, pk=None):
         """
         Update a playlist channel.
@@ -200,6 +199,19 @@ class ChannelsViewSet(viewsets.ViewSet):
                 channel.logo_url = serializer.validated_data['logo_url']
             if 'provider_channel_id' in serializer.validated_data:
                 channel.provider_channel_id = serializer.validated_data['provider_channel_id']
+            if 'order' in serializer.validated_data:
+                new_order = serializer.validated_data['order']
+                if new_order > channel.order:
+                    first = channel.order + 1
+                    last = new_order
+                    change = -1
+                else:
+                    first = new_order
+                    last = channel.order - 1
+                    change = 1
+
+                channel.playlist.channels.filter(order__gte=first, order__lte=last).update(order=F('order') + change)
+                channel.order = new_order
 
             channel.save()
             return Response(status=status.HTTP_204_NO_CONTENT)
