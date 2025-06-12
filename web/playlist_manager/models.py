@@ -8,17 +8,8 @@ class Playlist(models.Model):
     Model representing a playlist.
     """
     name = models.CharField(max_length=255)
-    order = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['order'], name='playlist_order_idx'),
-        ]
-        constraints = [
-            models.UniqueConstraint(fields=['order'], name='unique_playlist_order')
-        ]
 
     def __str__(self):
         return self.name

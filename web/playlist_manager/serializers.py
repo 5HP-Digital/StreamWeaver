@@ -61,28 +61,6 @@ class PlaylistUpdateSerializer(serializers.ModelSerializer):
         return value
 
 
-class PlaylistReorderSerializer(serializers.Serializer):
-    """
-    Serializer for reordering playlists.
-    """
-    playlist_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        required=True
-    )
-
-    def validate_playlist_ids(self, value):
-        # Check if all IDs are unique
-        if len(value) != len(set(value)):
-            raise serializers.ValidationError("Playlist IDs must be unique.")
-
-        # Check if all IDs exist and if all existing playlists are included
-        existing_ids = set(Playlist.objects.values_list('id', flat=True))
-        if set(value) != existing_ids:
-            raise serializers.ValidationError("All existing playlist IDs must be included, and no extra IDs.")
-
-        return value
-
-
 class ProviderWithDetailsSerializer(serializers.ModelSerializer):
     """
     Serializer for Provider model with minimal details.

@@ -1,9 +1,10 @@
-﻿from django.shortcuts import get_object_or_404
+﻿from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from math import ceil
-from django.db.models import Max
+from django.db.models import Max, F
 
 from .models import Playlist, PlaylistChannel
 from .serializers import (
@@ -26,8 +27,8 @@ class PlaylistsViewSet(viewsets.ViewSet):
         """
         Get a list of playlists.
         """
-        # Get the playlists, ordered by order ascending
-        playlists = Playlist.objects.all().order_by('order')
+        # Get the playlists, ordered by name ascending
+        playlists = Playlist.objects.all().order_by('name')
         serializer = PlaylistSerializer(playlists, many=True)
 
         response_data = {
@@ -50,14 +51,9 @@ class PlaylistsViewSet(viewsets.ViewSet):
         """
         serializer = PlaylistCreateSerializer(data=request.data)
         if serializer.is_valid():
-            # Get the maximum order value and add 1, or use 1 if no records exist
-            max_order = Playlist.objects.aggregate(Max('order'))['order__max']
-            new_order = 1 if max_order is None else max_order + 1
-
             # Create the playlist with the calculated order
             playlist = Playlist.objects.create(
-                name=serializer.validated_data['name'],
-                order=new_order
+                name=serializer.validated_data['name']
             )
 
             return Response(
@@ -85,24 +81,6 @@ class PlaylistsViewSet(viewsets.ViewSet):
         playlist = get_object_or_404(Playlist, pk=pk)
         playlist.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @action(detail=False, methods=['put'])
-    def reorder(self, request):
-        """
-        Reorder playlists.
-        """
-        serializer = PlaylistReorderSerializer(data=request.data)
-        if serializer.is_valid():
-            playlist_ids = serializer.validated_data['playlist_ids']
-
-            # Update the order of each playlist
-            for index, playlist_id in enumerate(playlist_ids, start=1):
-                playlist = Playlist.objects.get(pk=playlist_id)
-                playlist.order = index
-                playlist.save()
-
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['get'])
     def channels(self, request, pk=None):
@@ -184,6 +162,7 @@ class PlaylistsViewSet(viewsets.ViewSet):
             # Create the playlist channel
             channel = PlaylistChannel.objects.create(
                 title=serializer.validated_data['title'],
+                tvg_id=serializer.validated_data.get('tvg_id'),
                 category=serializer.validated_data.get('category'),
                 logo_url=serializer.validated_data.get('logo_url'),
                 playlist=playlist,
@@ -213,6 +192,8 @@ class ChannelsViewSet(viewsets.ViewSet):
             # Update the fields that are present in the request
             if 'title' in serializer.validated_data:
                 channel.title = serializer.validated_data['title']
+            if 'tvg_id' in serializer.validated_data:
+                channel.tvg_id = serializer.validated_data['tvg_id']
             if 'category' in serializer.validated_data:
                 channel.category = serializer.validated_data['category']
             if 'logo_url' in serializer.validated_data:
@@ -224,10 +205,16 @@ class ChannelsViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @transaction.atomic
     def destroy(self, request, pk=None):
         """
         Delete a playlist channel.
         """
         channel = get_object_or_404(PlaylistChannel, pk=pk)
+        removed_order = channel.order
         channel.delete()
+        
+        # Reorder the remaining channels in the playlist
+        channel.playlist.channels.filter(order__gt=removed_order).update(order=F('order') - 1)
+        
         return Response(status=status.HTTP_204_NO_CONTENT)
