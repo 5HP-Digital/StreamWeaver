@@ -663,7 +663,7 @@
 
                 axios.get('/api/providers/')
                     .then(response => {
-                        this.providers = response.data;
+                        this.providers = response.data.items;
                         this.loading = false;
                     })
                     .catch(error => {

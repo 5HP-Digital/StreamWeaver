@@ -24,57 +24,15 @@ class PlaylistsViewSet(viewsets.ViewSet):
 
     def list(self, request):
         """
-        Get a paginated list of playlists.
-
-        Query Parameters:
-            page: The page number (default: 1)
-            size: The page size (default: 10)
+        Get a list of playlists.
         """
-        # Validate pagination parameters
-        page = int(request.query_params.get('page', 1))
-        size = int(request.query_params.get('size', 10))
-
-        if page < 1:
-            return Response(
-                {"error": "Page number must be greater than or equal to 1"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if size < 1 or size > 100:
-            return Response(
-                {"error": "Page size must be between 1 and 100"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Get total count of playlists
-        query = Playlist.objects.all()
-        total_items = query.count()
-
-        # Calculate pagination values
-        total_pages = ceil(total_items / size) if total_items > 0 else 1
-        skip = (page - 1) * size
-
-        # Get the playlists for the current page, ordered by order ascending
-        playlists = query.order_by('order')[skip:skip+size]
-
-        # Create response with pagination links
-        base_url = request.build_absolute_uri().split('?')[0]
+        # Get the playlists, ordered by order ascending
+        playlists = Playlist.objects.all().order_by('order')
+        serializer = PlaylistSerializer(playlists, many=True)
 
         response_data = {
-            'page': page,
-            'total': total_items,
-            'items': PlaylistSerializer(playlists, many=True).data,
-            'links': {}
+            'items': serializer.data
         }
-
-        # Add pagination links
-        if page > 1:
-            response_data['links']['first'] = f"{base_url}?page=1&size={size}"
-            response_data['links']['previous'] = f"{base_url}?page={page - 1}&size={size}"
-
-        if page < total_pages:
-            response_data['links']['next'] = f"{base_url}?page={page + 1}&size={size}"
-            response_data['links']['last'] = f"{base_url}?page={total_pages}&size={size}"
 
         return Response(response_data)
 

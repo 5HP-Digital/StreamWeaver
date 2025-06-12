@@ -1,3 +1,4 @@
+from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -143,9 +144,14 @@ class ProvidersViewSet(viewsets.ViewSet):
         """
         Get all providers.
         """
-        providers = Provider.objects.all()
+        providers = Provider.objects.all().order_by('-is_enabled', Lower('name'))
         serializer = ProviderSerializer(providers, many=True)
-        return Response(serializer.data)
+
+        response_data = {
+            'items': serializer.data
+        }
+
+        return Response(response_data)
 
     def retrieve(self, request, pk=None):
         """
