@@ -13,3 +13,10 @@ def providers(request):
     View for the Providers page
     """
     return render(request, 'home/providers.html')
+
+
+def playlists(request):
+    """
+    View for the Playlists page
+    """
+    return render(request, 'home/playlists.html')

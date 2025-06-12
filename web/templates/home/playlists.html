@@ -1,0 +1,447 @@
+﻿{% extends 'base.html' %}
+
+{% block extra_head %}
+<style>
+    .card {
+        margin-bottom: 20px;
+    }
+    .playlist-card {
+        height: 100%;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+    }
+    .modal-backdrop {
+        opacity: 0.5;
+    }
+    .channel-count-link {
+        color: #0d6efd;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+    .channel-count-link:hover {
+        color: #0a58ca;
+    }
+    .inactive-channel {
+        opacity: 0.5;
+    }
+    .channel-logo {
+        max-width: 40px;
+        max-height: 40px;
+        margin-right: 10px;
+    }
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="app">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">Playlists</h1>
+        <button class="btn btn-primary" @click="showAddModal">
+            <i class="bi bi-plus"></i> Add New Playlist
+        </button>
+    </div>
+
+    <div class="alert alert-info" v-if="loading">
+        <div class="spinner-border spinner-border-sm" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading playlists...
+    </div>
+
+    <div class="alert alert-danger" v-if="error">
+        [[ error ]]
+    </div>
+
+    <div class="row" v-if="!loading && !error">
+        <div v-if="playlists.length === 0" class="col-12">
+            <div class="alert alert-warning">
+                No playlists found. Click "Add New Playlist" to create one.
+            </div>
+        </div>
+        <div v-for="playlist in playlists" :key="playlist.id" class="col-md-4 mb-4">
+            <div class="card playlist-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title mb-0">[[ playlist.name ]]</h5>
+                    </div>
+                    <p class="card-text">
+                        <strong>Channels:</strong> 
+                        <span v-if="playlist.channel_count > 0"
+                              class="channel-count-link" 
+                              @click="showChannelsModal(playlist)">
+                            [[ playlist.channel_count ]]
+                        </span>
+                        <span v-else>[[ 0 ]]</span>
+                        <span v-if="playlist.inactive_channel_count > 0">([[ playlist.inactive_channel_count ]] inactive)</span>
+                    </p>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            Created: [[ formatDate(playlist.created_at) ]]<br>
+                            Updated: [[ formatDate(playlist.updated_at) ]]
+                        </small>
+                    </p>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm btn-primary" @click="showEditModal(playlist)">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <button class="btn btn-sm btn-danger" @click="confirmDelete(playlist)">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Playlist Modal -->
+    <div class="modal fade" id="playlistModal" tabindex="-1" aria-labelledby="playlistModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="playlistModalLabel">[[ editMode ? 'Edit' : 'Add' ]] Playlist</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger" v-if="formError">
+                        [[ formError ]]
+                    </div>
+                    <form @submit.prevent="savePlaylist">
+                        <div class="mb-3">
+                            <label for="playlistName" class="form-label">Name</label>
+                            <input type="text" class="form-control" id="playlistName" v-model="currentPlaylist.name" required maxlength="100">
+                            <div class="form-text">Required, maximum 100 characters</div>
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" :disabled="formSubmitting">
+                                <span v-if="formSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                Save
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the playlist "[[ currentPlaylist.name ]]"?</p>
+                    <p class="text-danger">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" @click="deletePlaylist" :disabled="formSubmitting">
+                        <span v-if="formSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Channels List Modal -->
+    <div class="modal fade channel-list-modal" id="channelsModal" tabindex="-1" aria-labelledby="channelsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="channelsModalLabel">Channels for "[[ currentPlaylist.name ]]"</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="channelsLoading" class="text-center p-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Loading channels...</p>
+                    </div>
+
+                    <div v-else-if="channelsError" class="alert alert-danger">
+                        [[ channelsError ]]
+                    </div>
+
+                    <div v-else-if="channels.length === 0" class="alert alert-info">
+                        No channels found for this playlist.
+                    </div>
+
+                    <div v-else>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Title</th>
+                                        <th>Category</th>
+                                        <th>TVG ID</th>
+                                        <th>Provider</th>
+                                        <th>Updated</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="channel in channels" :key="channel.id" :class="{'inactive-channel': !channel.provider_channel.is_active}">
+                                        <td>
+                                            <img v-if="channel.logo_url || channel.provider_channel.logo_url" 
+                                                 :src="channel.logo_url || channel.provider_channel.logo_url" 
+                                                 class="channel-logo" 
+                                                 @error="handleLogoError">
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                [[ channel.title || channel.provider_channel.title ]]
+                                            </div>
+                                        </td>
+                                        <td>[[ channel.category ]]</td>
+                                        <td>[[ channel.tvg_id || channel.provider_channel.tvg_id ]]</td>
+                                        <td>[[ channel.provider_channel.provider.name ]]</td>
+                                        <td>[[ formatDate(channel.updated_at) ]]</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="pagination-container" v-if="channelsTotalPages > 1">
+                            <nav aria-label="Channel list pagination">
+                                <ul class="pagination">
+                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(1)">First</a>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(channelsCurrentPage - 1)">Previous</a>
+                                    </li>
+
+                                    <li v-for="page in paginationPages" :key="page" class="page-item" :class="{ active: channelsCurrentPage === page }">
+                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(page)">[[ page ]]</a>
+                                    </li>
+
+                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === channelsTotalPages }">
+                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(channelsCurrentPage + 1)">Next</a>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === channelsTotalPages }">
+                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(channelsTotalPages)">Last</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Create Vue app
+    const app = new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            playlists: [],
+            loading: true,
+            error: null,
+            currentPlaylist: {
+                id: null,
+                name: '',
+                channel_count: 0,
+                inactive_channel_count: 0,
+                created_at: null,
+                updated_at: null
+            },
+            editMode: false,
+            formError: null,
+            formSubmitting: false,
+            playlistModal: null,
+            deleteModal: null,
+            channelsModal: null,
+            // Channels data
+            channels: [],
+            channelsLoading: false,
+            channelsError: null,
+            channelsCurrentPage: 1,
+            channelsTotalPages: 1,
+            channelsPageSize: 10
+        },
+        mounted() {
+            this.fetchPlaylists();
+            this.playlistModal = new bootstrap.Modal(document.getElementById('playlistModal'));
+            this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            this.channelsModal = new bootstrap.Modal(document.getElementById('channelsModal'));
+        },
+        computed: {
+            paginationPages() {
+                // Generate an array of page numbers to display in pagination
+                // Show at most 5 pages, centered around the current page
+                const totalPages = this.channelsTotalPages;
+                const currentPage = this.channelsCurrentPage;
+
+                if (totalPages <= 5) {
+                    // If there are 5 or fewer pages, show all of them
+                    return Array.from({ length: totalPages }, (_, i) => i + 1);
+                } else {
+                    // Otherwise, show 5 pages centered around the current page
+                    let startPage = Math.max(currentPage - 2, 1);
+                    let endPage = startPage + 4;
+
+                    if (endPage > totalPages) {
+                        endPage = totalPages;
+                        startPage = Math.max(endPage - 4, 1);
+                    }
+
+                    return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+                }
+            }
+        },
+        methods: {
+            fetchPlaylists() {
+                this.loading = true;
+                this.error = null;
+
+                axios.get('/api/playlists/')
+                    .then(response => {
+                        this.playlists = response.data.items;
+                        this.loading = false;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching playlists:', error);
+                        this.error = 'Failed to load playlists. Please try again later.';
+                        this.loading = false;
+                    });
+            },
+            showAddModal() {
+                this.editMode = false;
+                this.currentPlaylist = {
+                    id: null,
+                    name: ''
+                };
+                this.formError = null;
+                this.playlistModal.show();
+            },
+            showEditModal(playlist) {
+                this.editMode = true;
+                this.currentPlaylist = {
+                    id: playlist.id,
+                    name: playlist.name
+                };
+                this.formError = null;
+                this.playlistModal.show();
+            },
+            savePlaylist() {
+                this.formSubmitting = true;
+                this.formError = null;
+
+                const payload = {
+                    name: this.currentPlaylist.name
+                }
+
+                const request = this.editMode
+                    ? axios.patch(`/api/playlists/${this.currentPlaylist.id}/`, payload)
+                    : axios.post('/api/playlists/', payload);
+
+                request
+                    .then(() => {
+                        this.playlistModal.hide();
+                        this.fetchPlaylists();
+                        this.formSubmitting = false;
+                    })
+                    .catch(error => {
+                        console.error('Error saving playlist:', error);
+                        this.formError = 'Failed to save playlist. Please check your input and try again.';
+                        this.formSubmitting = false;
+                    });
+            },
+            confirmDelete(playlist) {
+                this.currentPlaylist = {
+                    id: playlist.id,
+                    name: playlist.name
+                };
+                this.deleteModal.show();
+            },
+            deletePlaylist() {
+                this.formSubmitting = true;
+
+                axios.delete(`/api/playlists/${this.currentPlaylist.id}/`)
+                    .then(() => {
+                        this.deleteModal.hide();
+                        this.fetchPlaylists();
+                        this.formSubmitting = false;
+                    })
+                    .catch(error => {
+                        console.error('Error deleting playlist:', error);
+                        this.formSubmitting = false;
+                        // Show error in delete modal
+                        document.querySelector('#deleteModal .modal-body').innerHTML += 
+                            `<div class="alert alert-danger mt-3">Failed to delete playlist. Please try again later.</div>`;
+                    });
+            },
+            showChannelsModal(playlist) {
+                // Set current playlist
+                this.currentPlaylist = playlist;
+
+                // Reset channels data
+                this.channels = [];
+                this.channelsCurrentPage = 1;
+                this.channelsTotalPages = 1;
+                this.channelsError = null;
+
+                // Show modal
+                this.channelsModal.show();
+
+                // Load first page of channels
+                this.loadChannelsPage(1);
+            },
+            loadChannelsPage(page) {
+                this.channelsLoading = true;
+                this.channelsError = null;
+
+                // Fetch channels for the specified page
+                axios.get(`/api/playlists/${this.currentPlaylist.id}/channels/`, {
+                    params: {
+                        page: page,
+                        size: this.channelsPageSize
+                    }
+                })
+                .then(response => {
+                    // Update channels data
+                    this.channels = response.data.items;
+                    this.channelsCurrentPage = response.data.page;
+                    this.channelsTotalPages = Math.ceil(response.data.total / this.channelsPageSize);
+                    this.channelsLoading = false;
+                })
+                .catch(error => {
+                    console.error('Error fetching channels:', error);
+                    this.channelsError = 'Failed to load channels. Please try again.';
+                    this.channelsLoading = false;
+                });
+            },
+            handleLogoError(event) {
+                // Replace broken image with a placeholder or hide it
+                event.target.style.display = 'none';
+            },
+            formatDate(dateString) {
+                if (!dateString) return 'N/A';
+                const date = new Date(dateString);
+                return date.toLocaleString();
+            }
+        }
+    });
+</script>
+{% endblock %}

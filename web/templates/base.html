@@ -65,6 +65,9 @@
                         <a class="nav-link {% if request.path == '/providers/' %}active{% endif %}" href="{% url 'home:providers' %}">Providers</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/playlists/' %}active{% endif %}" href="{% url 'home:playlists' %}">Playlists</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="#">TV Schedule</a>
                     </li>
                     <li class="nav-item">
