@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from math import ceil
 from django.db.models import Max, F
+from unicodedata import category
 
 from .models import Playlist, PlaylistChannel
 from .serializers import (
@@ -174,6 +175,19 @@ class PlaylistsViewSet(viewsets.ViewSet):
                 status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def categories(self, request, pk=None):
+        """
+        Retrieves a list of existing playlist channel categories.
+        """
+        playlist = get_object_or_404(Playlist, pk=pk)
+
+        categories = PlaylistChannel.objects.filter(playlist=playlist, category__isnull=False).values_list('category', flat=True).distinct()
+        response_data = {
+            'items': categories,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class ChannelsViewSet(viewsets.ViewSet):

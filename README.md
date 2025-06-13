@@ -50,8 +50,8 @@ A web application for managing IPTV services, TV schedules, and more.
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/iptv-manager.git
-   cd iptv-manager
+   git clone https://github.com/5HP-Digital/StreamWeaver.git
+   cd StreamWeaver
    ```
 
 2. Create and activate a virtual environment:
@@ -65,11 +65,11 @@ A web application for managing IPTV services, TV schedules, and more.
 
 3. Install dependencies:
    ```
-   cd iptv_manager
+   cd web
    pip install -r requirements.txt
    ```
 
-4. Create a `.env` file in the `iptv_manager` directory with the following content:
+4. Create a `.env` file in the `web` directory with the following content:
    ```
    # Django settings
    SECRET_KEY="your-secret-key"
@@ -77,6 +77,9 @@ A web application for managing IPTV services, TV schedules, and more.
 
    # Database settings
    # SQLite3 is used by default, no additional configuration needed
+
+   # Configuration storage
+   CONFIG_DIR="../config"
 
    # CORS settings
    CORS_ALLOW_ALL_ORIGINS=True
@@ -93,7 +96,7 @@ A web application for managing IPTV services, TV schedules, and more.
    python manage.py runserver
 
    # Or using Daphne (ASGI server, recommended for WebSocket support)
-   daphne -b 0.0.0.0 -p 8000 iptv_manager.asgi:application
+   daphne -b 0.0.0.0 -p 8000 main.asgi:application
    ```
 
 7. Access the application in your browser:
@@ -103,12 +106,13 @@ A web application for managing IPTV services, TV schedules, and more.
 
 ## Environment Variables
 
-The application uses environment variables for configuration. These are stored in a `.env` file in the `iptv_manager` directory. A sample `.env` file is provided in the setup instructions above.
+The application uses environment variables for configuration. These are stored in a `.env` file in the `web` directory. A sample `.env` file is provided in the setup instructions above.
 
 Key environment variables include:
 - `SECRET_KEY`: Django's secret key for security
 - `DEBUG`: Set to True for development, False for production
 - `CORS_ALLOW_ALL_ORIGINS`: Controls CORS settings
+- `CONFIG_DIR`: Path where various configurations are stored (Sqlite, JSON files, etc.)
 
 Note: The `.env` file is included in `.gitignore` to prevent sensitive information from being committed to the repository.
 
@@ -117,8 +121,8 @@ Note: The `.env` file is included in `.gitignore` to prevent sensitive informati
 ### Project Structure
 
 ```
-iptv_manager/
-├── iptv_manager/          # Django project settings
+web/
+├── main/                  # Django project settings
 ├── home/                  # Home app (dashboard, system stats)
 │   ├── api/               # REST API endpoints
 │   └── ...
@@ -186,9 +190,7 @@ If you find this project helpful, please consider supporting its continued devel
 You can sponsor me directly through GitHub Sponsors:
 [🚀 Sponsor on GitHub](https://github.com/sponsors/5HP-Digital)
 
-Or make a one-time contribution via:
-[☕ Buy Me a Coffee](https://www.buymeacoffee.com/n.shay)
-[💖 Donate on Liberapay](https://liberapay.com/n-shay)
+Alternatively, you can [☕ Buy Me a Coffee](https://www.buymeacoffee.com/n.shay) or [💖 Donate on Liberapay](https://liberapay.com/n-shay)
 
 Your support helps keep this project alive and thriving!
 
