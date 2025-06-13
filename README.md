@@ -179,6 +179,19 @@ The following API endpoints are available:
 
 - `/ws/system-stats/` - Real-time system statistics updates
 
+## Support This Project
+
+If you find this project helpful, please consider supporting its continued development!
+
+You can sponsor me directly through GitHub Sponsors:
+[🚀 Sponsor on GitHub](https://github.com/sponsors/5HP-Digital)
+
+Or make a one-time contribution via:
+[☕ Buy Me a Coffee](https://www.buymeacoffee.com/n.shay)
+[💖 Donate on Liberapay](https://liberapay.com/n-shay)
+
+Your support helps keep this project alive and thriving!
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
