@@ -90,7 +90,8 @@
                 <table class="table table-striped">
                     <thead>
                         <tr>
-                            <th>Order</th>
+                            <th></th>
+                            <th>Ch #</th>
                             <th>Logo</th>
                             <th>Title</th>
                             <th>TVG ID</th>
@@ -108,6 +109,7 @@
                                     <i v-if="currentPage < totalPages" class="bi bi-caret-right mx-0" @click="moveChannelPageDown(channel)" :title='"Move to Page " + (currentPage + 1)'></i>
                                 </div>
                             </td>
+                            <td>[[ channel.num ]]</td>
                             <td>
                                 <img v-if="channel.logo_url || (channel.provider_channel && channel.provider_channel.logo_url)" 
                                      :src="channel.logo_url || (channel.provider_channel ? channel.provider_channel.logo_url : '')" 

@@ -13,7 +13,7 @@ class PlaylistSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Playlist
-        fields = ['id', 'name', 'created_at', 'updated_at', 'channel_count', 'inactive_channel_count']
+        fields = ['id', 'name', 'starting_channel_number', 'created_at', 'updated_at', 'channel_count', 'inactive_channel_count']
         read_only_fields = ['id', 'created_at', 'updated_at', 'channel_count', 'inactive_channel_count']
 
     def get_channel_count(self, obj):
@@ -34,14 +34,20 @@ class PlaylistCreateSerializer(serializers.ModelSerializer):
     Serializer for creating a Playlist.
     """
     name = serializers.CharField(required=True)
+    starting_channel_number = serializers.IntegerField(required=False, default=1)
 
     class Meta:
         model = Playlist
-        fields = ['name']
+        fields = ['name', 'starting_channel_number']
 
     def validate_name(self, value):
         if not value.strip():
             raise serializers.ValidationError("Name cannot be empty.")
+        return value
+
+    def validate_starting_channel_number(self, value):
+        if value < 1:
+            raise serializers.ValidationError("Starting channel number must be greater than 0.")
         return value
 
 
@@ -50,16 +56,21 @@ class PlaylistUpdateSerializer(serializers.ModelSerializer):
     Serializer for updating a Playlist.
     """
     name = serializers.CharField(required=True)
+    starting_channel_number = serializers.IntegerField(required=False)
 
     class Meta:
         model = Playlist
-        fields = ['name']
+        fields = ['name', 'starting_channel_number']
 
     def validate_name(self, value):
         if not value.strip():
             raise serializers.ValidationError("Name cannot be empty.")
         return value
 
+    def validate_starting_channel_number(self, value):
+        if value < 1:
+            raise serializers.ValidationError("Starting channel number must be greater than 0.")
+        return value
 
 class ProviderWithDetailsSerializer(serializers.ModelSerializer):
     """
@@ -86,11 +97,18 @@ class PlaylistChannelSerializer(serializers.ModelSerializer):
     Serializer for PlaylistChannel model.
     """
     provider_channel = ProviderChannelWithDetailsSerializer(read_only=True)
+    num = serializers.SerializerMethodField()
 
     class Meta:
         model = PlaylistChannel
-        fields = ['id', 'title', 'tvg_id', 'category', 'logo_url', 'provider_channel', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = ['id', 'title', 'tvg_id', 'category', 'logo_url', 'provider_channel', 'created_at', 'updated_at', 'num', 'order']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'num']
+
+    def get_num(self, obj):
+        """
+        Calculate the channel number based on the order and the playlist's starting_channel_number.
+        """
+        return obj.playlist.starting_channel_number + obj.order - 1
 
 
 class PlaylistChannelCreateSerializer(serializers.ModelSerializer):

@@ -54,7 +54,8 @@ class PlaylistsViewSet(viewsets.ViewSet):
         if serializer.is_valid():
             # Create the playlist with the calculated order
             playlist = Playlist.objects.create(
-                name=serializer.validated_data['name']
+                name=serializer.validated_data['name'],
+                starting_channel_number=serializer.validated_data.get('starting_channel_number', 1)
             )
 
             return Response(
@@ -70,7 +71,11 @@ class PlaylistsViewSet(viewsets.ViewSet):
         playlist = get_object_or_404(Playlist, pk=pk)
         serializer = PlaylistUpdateSerializer(data=request.data)
         if serializer.is_valid():
-            playlist.name = serializer.validated_data['name']
+            if 'name' in serializer.validated_data:
+                playlist.name = serializer.validated_data['name']
+            if 'starting_channel_number' in serializer.validated_data:
+                playlist.starting_channel_number = serializer.validated_data['starting_channel_number']
+
             playlist.save()
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
