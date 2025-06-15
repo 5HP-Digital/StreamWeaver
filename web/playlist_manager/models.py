@@ -39,10 +39,11 @@ class PlaylistChannel(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['playlist', 'order'], name='playlist_channel_order_idx'),
+            models.Index(fields=['playlist', 'order'], name='playlist_channel_order_idx')
         ]
         constraints = [
-            models.UniqueConstraint(fields=['playlist', 'order'], name='unique_playlist_channel_order')
+            models.UniqueConstraint(fields=['playlist', 'order'], name='unique_playlist_channel_order'),
+            models.UniqueConstraint(fields=['playlist', 'provider_channel'], name='unique_playlist_channel_provider_channel')
         ]
 
     def __str__(self):

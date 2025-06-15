@@ -1,4 +1,5 @@
-﻿from django.db import transaction
+﻿import channels
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -142,7 +143,7 @@ class PlaylistsViewSet(viewsets.ViewSet):
 
         return Response(response_data)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, url_path='playlists/<int:playlist_id>/channels', methods=['post'])
     def add_channel(self, request, pk=None):
         """
         Add a channel to a playlist.
@@ -161,7 +162,7 @@ class PlaylistsViewSet(viewsets.ViewSet):
 
             # Create the playlist channel
             channel = PlaylistChannel.objects.create(
-                title=serializer.validated_data['title'],
+                title=serializer.validated_data.get('title'),
                 tvg_id=serializer.validated_data.get('tvg_id'),
                 category=serializer.validated_data.get('category'),
                 logo_url=serializer.validated_data.get('logo_url'),
@@ -215,6 +216,18 @@ class ChannelsViewSet(viewsets.ViewSet):
                 channel.provider_channel_id = serializer.validated_data['provider_channel_id']
             if 'order' in serializer.validated_data:
                 new_order = serializer.validated_data['order']
+
+                # Validate
+                count = channel.playlist.channels.count()
+                if count == 1:
+                    return Response(
+                        { "error": "Cannot reorder the first channel." },
+                        status=status.HTTP_400_BAD_REQUEST)
+                if new_order > count:
+                    return Response(
+                        { "error": f"Order must be between 1 and {count}." },
+                        status=status.HTTP_400_BAD_REQUEST)
+
                 if new_order > channel.order:
                     first = channel.order + 1
                     last = new_order
@@ -224,7 +237,19 @@ class ChannelsViewSet(viewsets.ViewSet):
                     last = channel.order - 1
                     change = 1
 
-                channel.playlist.channels.filter(order__gte=first, order__lte=last).update(order=F('order') + change)
+                # Set a temporary order that won't conflict with any existing orders
+                # Use a negative number that's guaranteed to be unique
+                channel.order = -channel.pk
+                channel.save(update_fields=['order'])
+
+                # Update other channels' orders
+                query = channel.playlist.channels.filter(order__gte=first, order__lte=last)
+                query = reversed(query) if change > 0 else query
+                for ch in query:
+                    ch.order += change
+                    ch.save()
+
+                # Now set the final order
                 channel.order = new_order
 
             channel.save()
@@ -239,8 +264,8 @@ class ChannelsViewSet(viewsets.ViewSet):
         channel = get_object_or_404(PlaylistChannel, pk=pk)
         removed_order = channel.order
         channel.delete()
-        
+
         # Reorder the remaining channels in the playlist
         channel.playlist.channels.filter(order__gt=removed_order).update(order=F('order') - 1)
-        
+
         return Response(status=status.HTTP_204_NO_CONTENT)

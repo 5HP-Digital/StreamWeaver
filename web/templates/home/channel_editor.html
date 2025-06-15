@@ -53,6 +53,9 @@
             </a>
             <h1 class="h2 d-inline-block">Channel Editor: [[ playlistName ]]</h1>
         </div>
+        <button class="btn btn-primary" @click="showAddChannelModal">
+            <i class="bi bi-plus"></i> Add New Channel
+        </button>
     </div>
 
     <div class="alert alert-info" v-if="loading">
@@ -100,9 +103,9 @@
                         <tr v-for="channel in channels" :key="channel.id" :class="{'inactive-channel': channel.provider_channel && !channel.provider_channel.is_active}">
                             <td>
                                 <div class="order-controls">
-                                    <i class="bi bi-arrow-up" @click="moveChannelUp(channel)" title="Move Up"></i>
+                                    <i v-if="currentPage > 1" class="bi bi-arrow-up" @click="moveChannelUp(channel)" :title='"Move to Page " + (currentPage - 1)'></i>
                                     <i class="bi bi-grip-vertical reorder-handle" title="Drag to Reorder"></i>
-                                    <i class="bi bi-arrow-down" @click="moveChannelDown(channel)" title="Move Down"></i>
+                                    <i v-if="currentPage < this.totalPages" class="bi bi-arrow-down" @click="moveChannelDown(channel)" :title='"Move to Page " + (currentPage + 1)'></i>
                                 </div>
                             </td>
                             <td>
@@ -111,15 +114,19 @@
                                      class="channel-logo" 
                                      @error="handleLogoError">
                             </td>
-                            <td>[[ channel.title || (channel.provider_channel ? channel.provider_channel.title : '') ]]</td>
-                            <td>[[ channel.tvg_id || (channel.provider_channel ? channel.provider_channel.tvg_id : '') ]]</td>
+                            <td>[[ channel.title || channel.provider_channel.title ]]</td>
+                            <td>[[ channel.tvg_id || channel.provider_channel.tvg_id ]]</td>
                             <td>[[ channel.category ]]</td>
                             <td @click="showChannelDetails(channel, $event)" style="cursor: pointer;">
-                                <span v-if="channel.provider_channel">[[ channel.provider_channel.title ]]</span>
-                                <span v-else>-</span>
+                                <span>[[ channel.provider_channel.title ]]</span>
                             </td>
                             <td>
-                                <!-- Actions will be added later -->
+                                <button class="btn btn-sm btn-primary me-1" @click="showEditChannelModal(channel)">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </button>
+                                <button class="btn btn-sm btn-danger" @click="confirmDeleteChannel(channel)">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
                             </td>
                         </tr>
                     </tbody>
@@ -174,12 +181,227 @@
             </div>
         </div>
     </div>
+
+    <!-- Add Channel Modal -->
+    <div class="modal fade" id="editChannelModal" tabindex="-1" aria-labelledby="addChannelModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addChannelModalLabel">[[ selectedChannel.id ? 'Edit Channel' : 'Add New Channel' ]]</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger" v-if="formError">
+                        [[ formError ]]
+                    </div>
+                    <form @submit.prevent="saveChannel">
+                        <div class="mb-3">
+                            <label for="channelTitle" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="channelTitle" v-model="selectedChannel.title">
+                            <div class="form-text">Optional</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="channelTvgId" class="form-label">TVG ID</label>
+                            <input type="text" class="form-control" id="channelTvgId" v-model="selectedChannel.tvg_id">
+                            <div class="form-text">Optional</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="channelLogo" class="form-label">Logo URL</label>
+                            <input type="url" class="form-control" id="channelLogo" v-model="selectedChannel.logo_url">
+                            <div class="form-text">Optional, must be a valid URL</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="channelCategory" class="form-label">Category</label>
+                            <div class="input-group">
+                                <select class="form-select" id="channelCategory" v-model="selectedChannel.category">
+                                    <option value="">Select a category...</option>
+                                    <option v-for="category in categories" :value="category">[[ category ]]</option>
+                                </select>
+                                <button class="btn btn-outline-secondary" type="button" @click="showNewCategoryModal">New...</button>
+                            </div>
+                            <div class="form-text">Optional</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="channelProvider" class="form-label">Provider</label>
+                            <select class="form-select" id="channelProvider" v-model="selectedChannelProviderId" @change="onProviderChange" required>
+                                <option value="">Select a provider...</option>
+                                <option v-for="provider in providers" :key="provider.id" :value="provider.id">[[ provider.name ]]</option>
+                            </select>
+                            <div class="form-text">Required</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="channelProviderChannel" class="form-label">Provider Channel</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="channelProviderChannel" 
+                                       :value="selectedChannel.provider_channel ? selectedChannel.provider_channel.title : ''"
+                                       disabled required>
+                                <button class="btn btn-outline-secondary" type="button" 
+                                        @click="showProviderChannelsModal" 
+                                        :disabled="!selectedChannelProviderId">Select...</button>
+                            </div>
+                            <div class="form-text">Required</div>
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" :disabled="formSubmitting || !isFormValid">
+                                <span v-if="formSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                Save
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Provider Channels Modal -->
+    <div class="modal fade" id="providerChannelsModal" tabindex="-1" aria-labelledby="providerChannelsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="providerChannelsModalLabel">Select Provider Channel</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="providerChannelsLoading" class="text-center p-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Loading channels...</p>
+                    </div>
+
+                    <div v-else-if="providerChannelsError" class="alert alert-danger">
+                        [[ providerChannelsError ]]
+                    </div>
+
+                    <div v-else-if="providerChannels.length === 0" class="alert alert-info">
+                        No channels found for this provider.
+                    </div>
+
+                    <div v-else>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Name</th>
+                                        <th>TVG-ID</th>
+                                        <th>Group</th>
+                                        <th>Updated</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="channel in providerChannels" :key="channel.id" :class="{'inactive-channel': !channel.is_active}">
+                                        <td>
+                                            <img v-if="channel.logo_url" :src="channel.logo_url" class="channel-logo" @error="handleLogoError">
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                [[ channel.title ]]
+                                            </div>
+                                        </td>
+                                        <td>[[ channel.tvg_id ]]</td>
+                                        <td>[[ channel.group ]]</td>
+                                        <td>[[ formatDate(channel.updated_at) ]]</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-primary" @click="selectProviderChannel(channel)">
+                                                Select
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="pagination-container" v-if="providerChannelsTotalPages > 1">
+                            <nav aria-label="Provider channel list pagination">
+                                <ul class="pagination">
+                                    <li class="page-item" :class="{ disabled: providerChannelsCurrentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="loadProviderChannelsPage(1)">First</a>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: providerChannelsCurrentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="loadProviderChannelsPage(providerChannelsCurrentPage - 1)">Previous</a>
+                                    </li>
+
+                                    <li v-for="page in providerChannelsPaginationPages" :key="page" class="page-item" :class="{ active: providerChannelsCurrentPage === page }">
+                                        <a class="page-link" href="#" @click.prevent="loadProviderChannelsPage(page)">[[ page ]]</a>
+                                    </li>
+
+                                    <li class="page-item" :class="{ disabled: providerChannelsCurrentPage === providerChannelsTotalPages }">
+                                        <a class="page-link" href="#" @click.prevent="loadProviderChannelsPage(providerChannelsCurrentPage + 1)">Next</a>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: providerChannelsCurrentPage === providerChannelsTotalPages }">
+                                        <a class="page-link" href="#" @click.prevent="loadProviderChannelsPage(providerChannelsTotalPages)">Last</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Category Modal -->
+    <div class="modal fade" id="newCategoryModal" tabindex="-1" aria-labelledby="newCategoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newCategoryModalLabel">Add New Category</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="categoryError" class="alert alert-danger">
+                        [[ categoryError ]]
+                    </div>
+                    <div class="mb-3">
+                        <label for="newCategoryName" class="form-label">Category Name</label>
+                        <input type="text" class="form-control" id="newCategoryName" v-model="newCategoryName">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @click="addNewCategory" :disabled="!newCategoryName">
+                        <span v-if="categorySubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Add
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the channel "[[ selectedChannel.title || (selectedChannel.provider_channel ? selectedChannel.provider_channel.title : '') ]]"?</p>
+                    <p class="text-danger">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" @click="deleteChannel" :disabled="formSubmitting">
+                        <span v-if="formSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     // Create Vue app
     const app = new Vue({
@@ -195,13 +417,48 @@
             totalPages: 1,
             pageSize: 10,
             sortable: null,
-            selectedChannel: null,
-            popover: null
+            popover: null,
+            // Add/Edit Channel Modal
+            editChannelModal: null,
+            providerChannelsModal: null,
+            newCategoryModal: null,
+            selectedChannel: {
+                id: null,
+                title: '',
+                tvg_id: '',
+                logo_url: '',
+                category: '',
+                provider_channel: null
+            },
+            selectedChannelProviderId: null,
+            formError: null,
+            formSubmitting: false,
+            providers: [],
+            categories: [],
+            newCategoryName: '',
+            categoryError: null,
+            categorySubmitting: false,
+            // Provider Channels Modal
+            providerChannels: [],
+            providerChannelsLoading: false,
+            providerChannelsError: null,
+            providerChannelsCurrentPage: 1,
+            providerChannelsTotalPages: 1,
+            providerChannelsPageSize: 10,
+            // Delete Channel
+            deleteModal: null,
         },
         mounted() {
             this.fetchPlaylist();
             this.loadPage(1);
-            
+            this.fetchProviders();
+
+            // Initialize modals
+            this.editChannelModal = new bootstrap.Modal(document.getElementById('editChannelModal'));
+            this.providerChannelsModal = new bootstrap.Modal(document.getElementById('providerChannelsModal'));
+            this.newCategoryModal = new bootstrap.Modal(document.getElementById('newCategoryModal'));
+            this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
             // Initialize Sortable.js after the DOM is updated
             this.$nextTick(() => {
                 this.initSortable();
@@ -229,6 +486,32 @@
 
                     return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
                 }
+            },
+            providerChannelsPaginationPages() {
+                // Generate an array of page numbers to display in pagination
+                // Show at most 5 pages, centered around the current page
+                const totalPages = this.providerChannelsTotalPages;
+                const currentPage = this.providerChannelsCurrentPage;
+
+                if (totalPages <= 5) {
+                    // If there are 5 or fewer pages, show all of them
+                    return Array.from({ length: totalPages }, (_, i) => i + 1);
+                } else {
+                    // Otherwise, show 5 pages centered around the current page
+                    let startPage = Math.max(currentPage - 2, 1);
+                    let endPage = startPage + 4;
+
+                    if (endPage > totalPages) {
+                        endPage = totalPages;
+                        startPage = Math.max(endPage - 4, 1);
+                    }
+
+                    return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+                }
+            },
+            isFormValid() {
+                // Check if the form is valid
+                return this.selectedChannel.provider_channel != null;
             }
         },
         methods: {
@@ -259,7 +542,7 @@
                     this.currentPage = response.data.page;
                     this.totalPages = Math.ceil(response.data.total / this.pageSize);
                     this.loading = false;
-                    
+
                     // Re-initialize sortable after data is loaded
                     this.$nextTick(() => {
                         this.initSortable();
@@ -281,19 +564,17 @@
                     this.sortable = new Sortable(el, {
                         handle: '.reorder-handle',
                         animation: 150,
-                        onEnd: this.handleDragEnd
+                        onEnd: this.handleDragEnd,
+                        draggable: 'tr',
                     });
                 }
             },
             handleDragEnd(evt) {
                 const channel = this.channels[evt.oldIndex];
                 const newOrder = evt.newIndex + 1 + (this.currentPage - 1) * this.pageSize;
-                
+
                 // Update the order in the backend
                 this.updateChannelOrder(channel.id, newOrder);
-                
-                // Reload the current page to reflect the changes
-                this.loadPage(this.currentPage);
             },
             updateChannelOrder(channelId, newOrder) {
                 axios.patch(`/api/channels/${channelId}/`, {
@@ -301,6 +582,9 @@
                 })
                 .then(() => {
                     console.log(`Channel ${channelId} order updated to ${newOrder}`);
+
+                    // Reload the current page to reflect the changes
+                    this.loadPage(this.currentPage);
                 })
                 .catch(error => {
                     console.error('Error updating channel order:', error);
@@ -340,16 +624,16 @@
             showChannelDetails(channel, event) {
                 // Hide any existing popovers
                 if (this.popover) {
-                    this.popover.dispose();
+                    this.closePopover(event)
                 }
-                
+
                 this.selectedChannel = channel;
-                
+
                 // Use Bootstrap's popover
                 this.$nextTick(() => {
                     const popoverTrigger = event.currentTarget;
                     const popoverContent = document.getElementById('channelDetailsTemplate').innerHTML;
-                    
+
                     this.popover = new bootstrap.Popover(popoverTrigger, {
                         html: true,
                         content: popoverContent,
@@ -357,11 +641,14 @@
                         trigger: 'manual',
                         container: 'body'
                     });
-                    
+
                     this.popover.show();
-                    
+
                     // Add click event to close popover when clicking outside
-                    document.addEventListener('click', this.closePopover);
+                    // Use setTimeout to delay adding the event listener until after the current event has finished propagating
+                    setTimeout(() => {
+                        document.addEventListener('click', this.closePopover);
+                    }, 0);
                 });
             },
             closePopover(event) {
@@ -376,7 +663,249 @@
             handleLogoError(event) {
                 // Replace broken image with a placeholder or hide it
                 event.target.style.display = 'none';
-            }
+            },
+
+            // Add Channel Modal Methods
+            fetchProviders() {
+                axios.get('/api/providers/')
+                    .then(response => {
+                        this.providers = response.data.items;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching providers:', error);
+                        this.formError = 'Failed to load providers. Please try again.';
+                    });
+            },
+
+            fetchCategories() {
+                axios.get(`/api/playlists/${this.playlistId}/categories/`)
+                    .then(response => {
+                        this.categories = response.data.items;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching categories:', error);
+                    });
+            },
+
+            showNewCategoryModal() {
+                // Reset form
+                this.newCategoryName = '';
+                this.categoryError = null;
+                this.categorySubmitting = false;
+
+                // Show modal
+                this.newCategoryModal.show();
+            },
+
+            addNewCategory() {
+                if (!this.newCategoryName) {
+                    this.categoryError = 'Please enter a category name.';
+                    return;
+                }
+
+                this.categorySubmitting = true;
+                this.categoryError = null;
+
+                // Check if category already exists
+                if (this.categories.includes(this.newCategoryName)) {
+                    this.categoryError = 'This category already exists.';
+                    this.categorySubmitting = false;
+                    return;
+                }
+
+                // Add the new category to the list
+                this.categories.push(this.newCategoryName);
+
+                // Set the new category as the selected one
+                this.selectedChannel.category = this.newCategoryName;
+
+                // Close the modal
+                this.newCategoryModal.hide();
+                this.categorySubmitting = false;
+            },
+
+            showAddChannelModal() {
+                // Reset form
+                this.selectedChannel = {
+                    id: null,
+                    title: '',
+                    tvg_id: '',
+                    logo_url: '',
+                    category: '',
+                    provider_channel: null
+                };
+                this.selectedChannelProviderId = null;
+                this.formError = null;
+                this.formSubmitting = false;
+
+                this.fetchCategories();
+
+                // Show modal
+                this.editChannelModal.show();
+            },
+
+            showEditChannelModal(channel) {
+                // Set to edit mode and populate form with channel data
+                this.selectedChannel = channel;
+                this.selectedChannelProviderId = channel.provider_channel.provider.id;
+                this.formError = null;
+                this.formSubmitting = false;
+
+                this.fetchCategories();
+
+                // Show modal
+                this.editChannelModal.show();
+            },
+
+            onProviderChange() {
+                // Reset provider channel when provider changes
+                this.selectedChannel.provider_channel = null;
+            },
+
+            showProviderChannelsModal() {
+                if (!this.selectedChannelProviderId) {
+                    return;
+                }
+
+                // Reset provider channels data
+                this.providerChannels = [];
+                this.providerChannelsCurrentPage = 1;
+                this.providerChannelsTotalPages = 1;
+                this.providerChannelsError = null;
+
+                // Show modal
+                this.providerChannelsModal.show();
+
+                // Load first page of provider channels
+                this.loadProviderChannelsPage(1);
+            },
+
+            loadProviderChannelsPage(page) {
+                this.providerChannelsLoading = true;
+                this.providerChannelsError = null;
+
+                // Fetch provider channels for the specified page
+                axios.get(`/api/providers/${this.selectedChannelProviderId}/channels/`, {
+                    params: {
+                        page: page,
+                        size: this.providerChannelsPageSize
+                    }
+                })
+                .then(response => {
+                    // Update provider channels data
+                    this.providerChannels = response.data.items;
+                    this.providerChannelsCurrentPage = response.data.page;
+                    this.providerChannelsTotalPages = Math.ceil(response.data.total / this.providerChannelsPageSize);
+                    this.providerChannelsLoading = false;
+                })
+                .catch(error => {
+                    console.error('Error fetching provider channels:', error);
+                    this.providerChannelsError = 'Failed to load provider channels. Please try again.';
+                    this.providerChannelsLoading = false;
+                });
+            },
+
+            selectProviderChannel(channel) {
+                // Set selected provider channel
+                this.selectedChannel.provider_channel = channel;
+
+                // Close provider channels modal
+                this.providerChannelsModal.hide();
+            },
+
+            saveChannel() {
+                // Validate form
+                if (!this.isFormValid) {
+                    this.formError = 'Please fill in all required fields.';
+                    return;
+                }
+
+                this.formSubmitting = true;
+                this.formError = null;
+
+                // Prepare payload
+                const payload = {
+                    provider_channel_id: this.selectedChannel.provider_channel.id
+                };
+
+                // Add optional fields if they have values
+                if (this.selectedChannel.title) {
+                    payload.title = this.selectedChannel.title;
+                }
+
+                if (this.selectedChannel.tvg_id) {
+                    payload.tvg_id = this.selectedChannel.tvg_id;
+                }
+
+                if (this.selectedChannel.category) {
+                    payload.category = this.selectedChannel.category;
+                }
+
+                if (this.selectedChannel.logo_url) {
+                    payload.logo_url = this.selectedChannel.logo_url;
+                }
+
+                if (this.selectedChannel.id) {
+                    // Send request to update channel
+                    axios.patch(`/api/channels/${this.selectedChannel.id}/`, payload)
+                        .then(response => {
+                            // Close modal
+                            this.editChannelModal.hide();
+
+                            // Refresh channels
+                            this.loadPage(this.currentPage);
+
+                            // Reset form
+                            this.formSubmitting = false;
+                        })
+                        .catch(error => {
+                            console.error('Error updating channel:', error);
+                            this.formError = 'Failed to update channel. Please check your input and try again.';
+                            this.formSubmitting = false;
+                        });
+                } else {
+                    // Send request to add channel
+                    axios.post(`/api/playlists/${this.playlistId}/channels/`, payload)
+                        .then(response => {
+                            // Close modal
+                            this.editChannelModal.hide();
+
+                            // Refresh channels
+                            this.loadPage(this.currentPage);
+
+                            // Reset form
+                            this.formSubmitting = false;
+                        })
+                        .catch(error => {
+                            console.error('Error adding channel:', error);
+                            this.formError = 'Failed to add channel. Please check your input and try again.';
+                            this.formSubmitting = false;
+                        });
+                }
+            },
+
+            formatDate(dateString) {
+                if (!dateString) return 'N/A';
+                const date = new Date(dateString);
+                return date.toLocaleString();
+            },
+
+            deleteChannel() {
+                axios.delete(`/api/channels/${this.selectedChannel.id}/`)
+                    .then(() => {
+                        // Refresh the channel list after successful deletion
+                        this.loadPage(this.currentPage);
+                    })
+                    .catch(error => {
+                        console.error('Error deleting channel:', error);
+                        this.error = 'Failed to delete channel. Please try again.';
+                    });
+            },
+
+            confirmDeleteChannel(channel) {
+                this.selectedChannel = channel;
+                this.deleteModal.show();
+            },
         }
     });
 </script>

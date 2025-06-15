@@ -97,7 +97,7 @@ class PlaylistChannelCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating a PlaylistChannel.
     """
-    title = serializers.CharField(required=True)
+    title = serializers.CharField(required=False)
     provider_channel_id = serializers.IntegerField(required=True)
 
     class Meta:
@@ -154,12 +154,5 @@ class PlaylistChannelUpdateSerializer(serializers.ModelSerializer):
     def validate_order(self, value):
         if value < 1:
             raise serializers.ValidationError("Order must be greater than 0.")
-
-        playlist_channel = PlaylistChannel.objects.get(pk=self.instance.pk)
-        count = playlist_channel.playlist.channels.count()
-        if count == 1:
-            raise serializers.ValidationError("Cannot reorder the first channel.")
-        if value > count:
-            raise serializers.ValidationError(f"Order must be between 1 and {count}.")
 
         return value
