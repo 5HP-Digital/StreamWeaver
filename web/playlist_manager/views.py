@@ -83,99 +83,95 @@ class PlaylistsViewSet(viewsets.ViewSet):
         playlist.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get', 'post'])
     def channels(self, request, pk=None):
         """
-        Get a paginated list of channels for a specific playlist.
+        GET: Get a paginated list of channels for a specific playlist.
+        POST: Add a channel to a playlist.
 
-        Query Parameters:
+        Query Parameters (GET only):
             page: The page number (default: 1)
             size: The page size (default: 10)
         """
-        # Validate pagination parameters
-        page = int(request.query_params.get('page', 1))
-        size = int(request.query_params.get('size', 10))
-
-        if page < 1:
-            return Response(
-                {"error": "Page number must be greater than or equal to 1"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if size < 1 or size > 100:
-            return Response(
-                {"error": "Page size must be between 1 and 100"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         # Check if playlist exists
         playlist = get_object_or_404(Playlist, pk=pk)
 
-        # Get total count of channels for this playlist
-        query = PlaylistChannel.objects.filter(playlist=playlist)
-        total_items = query.count()
+        if request.method == 'GET':
+            # Validate pagination parameters
+            page = int(request.query_params.get('page', 1))
+            size = int(request.query_params.get('size', 10))
 
-        # Calculate pagination values
-        total_pages = ceil(total_items / size) if total_items > 0 else 1
-        skip = (page - 1) * size
+            if page < 1:
+                return Response(
+                    {"error": "Page number must be greater than or equal to 1"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        # Get the channels for the current page, ordered by order
-        channels = query.order_by('order')[skip:skip+size]
+            if size < 1 or size > 100:
+                return Response(
+                    {"error": "Page size must be between 1 and 100"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        # Create response with pagination links
-        base_url = request.build_absolute_uri().split('?')[0]
+            # Get total count of channels for this playlist
+            query = PlaylistChannel.objects.filter(playlist=playlist)
+            total_items = query.count()
 
-        response_data = {
-            'page': page,
-            'total': total_items,
-            'items': PlaylistChannelSerializer(channels, many=True).data,
-            'links': {}
-        }
+            # Calculate pagination values
+            total_pages = ceil(total_items / size) if total_items > 0 else 1
+            skip = (page - 1) * size
 
-        # Add pagination links
-        if page > 1:
-            response_data['links']['first'] = f"{base_url}?page=1&size={size}"
-            response_data['links']['previous'] = f"{base_url}?page={page - 1}&size={size}"
+            # Get the channels for the current page, ordered by order
+            channels = query.order_by('order')[skip:skip+size]
 
-        if page < total_pages:
-            response_data['links']['next'] = f"{base_url}?page={page + 1}&size={size}"
-            response_data['links']['last'] = f"{base_url}?page={total_pages}&size={size}"
+            # Create response with pagination links
+            base_url = request.build_absolute_uri().split('?')[0]
 
-        return Response(response_data)
+            response_data = {
+                'page': page,
+                'total': total_items,
+                'items': PlaylistChannelSerializer(channels, many=True).data,
+                'links': {}
+            }
 
-    @action(detail=True, url_path='playlists/<int:playlist_id>/channels', methods=['post'])
-    def add_channel(self, request, pk=None):
-        """
-        Add a channel to a playlist.
-        """
-        # Check if playlist exists
-        playlist = get_object_or_404(Playlist, pk=pk)
+            # Add pagination links
+            if page > 1:
+                response_data['links']['first'] = f"{base_url}?page=1&size={size}"
+                response_data['links']['previous'] = f"{base_url}?page={page - 1}&size={size}"
 
-        serializer = PlaylistChannelCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            # Get the provider channel
-            provider_channel_id = serializer.validated_data['provider_channel_id']
+            if page < total_pages:
+                response_data['links']['next'] = f"{base_url}?page={page + 1}&size={size}"
+                response_data['links']['last'] = f"{base_url}?page={total_pages}&size={size}"
 
-            # Get the maximum order value and add 1, or use 1 if no records exist
-            max_order = PlaylistChannel.objects.filter(playlist=playlist).aggregate(Max('order'))['order__max']
-            new_order = 1 if max_order is None else max_order + 1
+            return Response(response_data)
+        elif request.method == 'POST':
+            serializer = PlaylistChannelCreateSerializer(data=request.data)
+            if serializer.is_valid():
+                # Get the provider channel
+                provider_channel_id = serializer.validated_data['provider_channel_id']
 
-            # Create the playlist channel
-            channel = PlaylistChannel.objects.create(
-                title=serializer.validated_data.get('title'),
-                tvg_id=serializer.validated_data.get('tvg_id'),
-                category=serializer.validated_data.get('category'),
-                logo_url=serializer.validated_data.get('logo_url'),
-                playlist=playlist,
-                provider_channel_id=provider_channel_id,
-                order=new_order
-            )
+                # Get the maximum order value and add 1, or use 1 if no records exist
+                max_order = PlaylistChannel.objects.filter(playlist=playlist).aggregate(Max('order'))['order__max']
+                new_order = 1 if max_order is None else max_order + 1
 
-            return Response(
-                PlaylistChannelSerializer(channel).data,
-                status=status.HTTP_201_CREATED
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                # Create the playlist channel
+                channel = PlaylistChannel.objects.create(
+                    title=serializer.validated_data.get('title'),
+                    tvg_id=serializer.validated_data.get('tvg_id'),
+                    category=serializer.validated_data.get('category'),
+                    logo_url=serializer.validated_data.get('logo_url'),
+                    playlist=playlist,
+                    provider_channel_id=provider_channel_id,
+                    order=new_order
+                )
+
+                return Response(
+                    PlaylistChannelSerializer(channel).data,
+                    status=status.HTTP_201_CREATED
+                )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
 
     @action(detail=True, methods=['get'])
     def categories(self, request, pk=None):
@@ -184,7 +180,7 @@ class PlaylistsViewSet(viewsets.ViewSet):
         """
         playlist = get_object_or_404(Playlist, pk=pk)
 
-        categories = PlaylistChannel.objects.filter(playlist=playlist, category__isnull=False).values_list('category', flat=True).distinct()
+        categories = PlaylistChannel.objects.filter(playlist=playlist, category__isnull=False).order_by('category').values_list('category', flat=True).distinct()
         response_data = {
             'items': categories,
         }

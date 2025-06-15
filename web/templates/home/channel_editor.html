@@ -103,9 +103,9 @@
                         <tr v-for="channel in channels" :key="channel.id" :class="{'inactive-channel': channel.provider_channel && !channel.provider_channel.is_active}">
                             <td>
                                 <div class="order-controls">
-                                    <i v-if="currentPage > 1" class="bi bi-arrow-up" @click="moveChannelUp(channel)" :title='"Move to Page " + (currentPage - 1)'></i>
-                                    <i class="bi bi-grip-vertical reorder-handle" title="Drag to Reorder"></i>
-                                    <i v-if="currentPage < this.totalPages" class="bi bi-arrow-down" @click="moveChannelDown(channel)" :title='"Move to Page " + (currentPage + 1)'></i>
+                                    <i v-if="currentPage > 1" class="bi bi-caret-left mx-0" @click="moveChannelPageUp(channel)" :title='"Move to Page " + (currentPage - 1)'></i>
+                                    <i class="bi bi-grip-vertical reorder-handle mx-0" title="Drag to Reorder"></i>
+                                    <i v-if="currentPage < totalPages" class="bi bi-caret-right mx-0" @click="moveChannelPageDown(channel)" :title='"Move to Page " + (currentPage + 1)'></i>
                                 </div>
                             </td>
                             <td>
@@ -215,7 +215,7 @@
                             <div class="input-group">
                                 <select class="form-select" id="channelCategory" v-model="selectedChannel.category">
                                     <option value="">Select a category...</option>
-                                    <option v-for="category in categories" :value="category">[[ category ]]</option>
+                                    <option v-for="category in selectedChannelCategories" :value="category">[[ category ]]</option>
                                 </select>
                                 <button class="btn btn-outline-secondary" type="button" @click="showNewCategoryModal">New...</button>
                             </div>
@@ -415,6 +415,7 @@
             error: null,
             currentPage: 1,
             totalPages: 1,
+            totalChannels: 0,
             pageSize: 10,
             sortable: null,
             popover: null,
@@ -435,6 +436,7 @@
             formSubmitting: false,
             providers: [],
             categories: [],
+            selectedChannelCategories: [],
             newCategoryName: '',
             categoryError: null,
             categorySubmitting: false,
@@ -452,6 +454,7 @@
             this.fetchPlaylist();
             this.loadPage(1);
             this.fetchProviders();
+            this.fetchCategories()
 
             // Initialize modals
             this.editChannelModal = new bootstrap.Modal(document.getElementById('editChannelModal'));
@@ -540,7 +543,8 @@
                     // Update channels data
                     this.channels = response.data.items;
                     this.currentPage = response.data.page;
-                    this.totalPages = Math.ceil(response.data.total / this.pageSize);
+                    this.totalChannels = response.data.total;
+                    this.totalPages = Math.ceil(this.totalChannels / this.pageSize);
                     this.loading = false;
 
                     // Re-initialize sortable after data is loaded
@@ -583,43 +587,34 @@
                 .then(() => {
                     console.log(`Channel ${channelId} order updated to ${newOrder}`);
 
-                    // Reload the current page to reflect the changes
-                    this.loadPage(this.currentPage);
+                    // Reload the page to reflect the changes
+                    const pageToLoad = Math.ceil(newOrder / this.pageSize)
+                    this.loadPage(pageToLoad);
                 })
                 .catch(error => {
                     console.error('Error updating channel order:', error);
                     this.error = 'Failed to update channel order. Please try again.';
                 });
             },
-            moveChannelUp(channel) {
+            moveChannelPageUp(channel) {
+                if (this.currentPage === 1) {
+                    return;
+                }
+
                 // Move channel up (decrease order)
-                const currentIndex = this.channels.indexOf(channel);
-                if (currentIndex > 0) {
-                    // If not the first item in the current page
-                    const newOrder = channel.order - 1;
-                    this.updateChannelOrder(channel.id, newOrder);
-                    this.loadPage(this.currentPage);
-                } else if (this.currentPage > 1) {
-                    // If first item in the page and not on the first page, move to previous page
-                    const newOrder = (this.currentPage - 1) * this.pageSize;
-                    this.updateChannelOrder(channel.id, newOrder);
-                    this.loadPage(this.currentPage - 1);
-                }
+                const currentOrder = (this.currentPage - 1) * this.pageSize + this.channels.indexOf(channel) + 1;
+                const newOrder = currentOrder - this.pageSize;
+                this.updateChannelOrder(channel.id, newOrder);
             },
-            moveChannelDown(channel) {
-                // Move channel down (increase order)
-                const currentIndex = this.channels.indexOf(channel);
-                if (currentIndex < this.channels.length - 1) {
-                    // If not the last item in the current page
-                    const newOrder = channel.order + 1;
-                    this.updateChannelOrder(channel.id, newOrder);
-                    this.loadPage(this.currentPage);
-                } else if (this.currentPage < this.totalPages) {
-                    // If last item in the page and not on the last page, move to next page
-                    const newOrder = this.currentPage * this.pageSize + 1;
-                    this.updateChannelOrder(channel.id, newOrder);
-                    this.loadPage(this.currentPage + 1);
+            moveChannelPageDown(channel) {
+                if (this.currentPage === this.totalPages) {
+                    return;
                 }
+
+                // Move channel down (increase order)
+                const currentOrder = (this.currentPage - 1) * this.pageSize + this.channels.indexOf(channel) + 1;
+                const newOrder = Math.min(currentOrder + this.pageSize, this.totalChannels);
+                this.updateChannelOrder(channel.id, newOrder);
             },
             showChannelDetails(channel, event) {
                 // Hide any existing popovers
@@ -707,14 +702,15 @@
                 this.categoryError = null;
 
                 // Check if category already exists
-                if (this.categories.includes(this.newCategoryName)) {
+                if (this.selectedChannelCategories.includes(this.newCategoryName)) {
                     this.categoryError = 'This category already exists.';
                     this.categorySubmitting = false;
                     return;
                 }
 
                 // Add the new category to the list
-                this.categories.push(this.newCategoryName);
+                this.selectedChannelCategories.push(this.newCategoryName);
+                this.selectedChannelCategories.sort()
 
                 // Set the new category as the selected one
                 this.selectedChannel.category = this.newCategoryName;
@@ -738,7 +734,7 @@
                 this.formError = null;
                 this.formSubmitting = false;
 
-                this.fetchCategories();
+                this.selectedChannelCategories = [...this.categories];
 
                 // Show modal
                 this.editChannelModal.show();
@@ -751,7 +747,7 @@
                 this.formError = null;
                 this.formSubmitting = false;
 
-                this.fetchCategories();
+                this.selectedChannelCategories = [...this.categories];
 
                 // Show modal
                 this.editChannelModal.show();
@@ -808,6 +804,7 @@
             selectProviderChannel(channel) {
                 // Set selected provider channel
                 this.selectedChannel.provider_channel = channel;
+                this.selectedChannel.provider_channel.provider = this.providers.find((p) => p.id == this.selectedChannelProviderId)
 
                 // Close provider channels modal
                 this.providerChannelsModal.hide();
@@ -855,13 +852,20 @@
                             // Refresh channels
                             this.loadPage(this.currentPage);
 
+                            // Refresh categories, if needed
+                            if (this.selectedChannel.category && !this.categories.include(this.selectedChannel.category)) {
+                                this.fetchCategories();
+                            }
+
                             // Reset form
                             this.formSubmitting = false;
+                            this.selectedChannelCategories = []
                         })
                         .catch(error => {
                             console.error('Error updating channel:', error);
                             this.formError = 'Failed to update channel. Please check your input and try again.';
                             this.formSubmitting = false;
+                            this.selectedChannelCategories = []
                         });
                 } else {
                     // Send request to add channel
@@ -873,13 +877,20 @@
                             // Refresh channels
                             this.loadPage(this.currentPage);
 
+                            // Refresh categories, if needed
+                            if (this.selectedChannel.category && !this.categories.include(this.selectedChannel.category)) {
+                                this.fetchCategories();
+                            }
+
                             // Reset form
                             this.formSubmitting = false;
+                            this.selectedChannelCategories = []
                         })
                         .catch(error => {
                             console.error('Error adding channel:', error);
                             this.formError = 'Failed to add channel. Please check your input and try again.';
                             this.formSubmitting = false;
+                            this.selectedChannelCategories = []
                         });
                 }
             },
@@ -895,6 +906,9 @@
                     .then(() => {
                         // Refresh the channel list after successful deletion
                         this.loadPage(this.currentPage);
+                        if (this.selectedChannel.category) {
+                            this.fetchCategories();
+                        }
                     })
                     .catch(error => {
                         console.error('Error deleting channel:', error);
