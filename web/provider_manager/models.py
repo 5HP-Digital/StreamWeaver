@@ -50,6 +50,12 @@ class ProviderSyncJob(models.Model):
         related_name='jobs'
     )
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['state'], name='provider_sync_job_state_idx'),
+            models.Index(fields=['job_id'], name='provider_sync_job_jobid_idx')
+        ]
+
     def __str__(self):
         return f"ProviderSyncJob {self.job_id} - {self.state}"
 
@@ -71,6 +77,13 @@ class ProviderStream(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['provider', 'is_active'], name='stream_provider_active_idx'),
+            models.Index(fields=['group', 'title', 'tvg_id'], name='stream_group_title_tvg_id_idx'),
+            models.Index(fields=['is_active'], name='provider_stream_active_idx')
+        ]
 
     def __str__(self):
         return self.title

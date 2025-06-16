@@ -1,12 +1,10 @@
-﻿import channels
-from django.db import transaction
+﻿from django.db import transaction
+from django.db.models import Max, F, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from math import ceil
-from django.db.models import Max, F
-from unicodedata import category
 
 from .models import Playlist, PlaylistChannel
 from .serializers import (
@@ -15,8 +13,10 @@ from .serializers import (
     PlaylistUpdateSerializer,
     PlaylistChannelSerializer,
     PlaylistChannelCreateSerializer,
-    PlaylistChannelUpdateSerializer
+    PlaylistChannelUpdateSerializer,
+    ProviderStreamWithDetailsSerializer
 )
+from provider_manager.models import ProviderStream
 
 
 class PlaylistsViewSet(viewsets.ViewSet):
@@ -127,7 +127,7 @@ class PlaylistsViewSet(viewsets.ViewSet):
             skip = (page - 1) * size
 
             # Get the channels for the current page, ordered by order
-            channels = query.order_by('order')[skip:skip+size]
+            channels = query.select_related('provider_stream', 'provider_stream__provider').order_by('order')[skip:skip+size]
 
             # Create response with pagination links
             base_url = request.build_absolute_uri().split('?')[0]
@@ -189,6 +189,123 @@ class PlaylistsViewSet(viewsets.ViewSet):
         response_data = {
             'items': categories,
         }
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'])
+    def available_streams(self, request, pk=None):
+        """
+        Get a paginated list of unassigned streams for a specific playlist.
+
+        Query Parameters:
+            page: The page number (default: 1)
+            size: The page size (default: 10)
+            provider_id: Filter by provider ID (optional)
+            is_active: Filter by active status (optional, true/false)
+            q: Text search in title, group, and tvg_id (optional)
+            sort_by: Field(s) to sort by, comma-separated (optional, default: group,title, options: title,tvg_id,group,is_active)
+        """
+        # Validate pagination parameters
+        page = int(request.query_params.get('page', 1))
+        size = int(request.query_params.get('size', 10))
+
+        if page < 1:
+            return Response(
+                {"error": "Page number must be greater than or equal to 1"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if size < 1 or size > 100:
+            return Response(
+                {"error": "Page size must be between 1 and 100"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate sorting parameter
+        sort_param = request.query_params.get('sort_by', 'group,title')
+        sort_fields = sort_param.split(',')
+
+        # Validate sort fields against the serializer fields
+        valid_sort_fields = ['title', 'tvg_id', 'group', 'is_active']
+        order_by_fields = []
+
+        for field in sort_fields:
+            clean_field = field[1:] if field.startswith('-') else field
+            if clean_field in valid_sort_fields:
+                order_by_fields.append(field)  # Keep the '-' prefix for descending order
+            else:
+                return Response(
+                    {"error": f"Invalid sort field: {field}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        playlist = get_object_or_404(Playlist, pk=pk)
+
+        # Get all provider streams that are not assigned to any channel in this playlist
+        # Start with all streams
+        query = ProviderStream.objects.all()
+
+        # Exclude streams that are already assigned to this playlist
+        assigned_stream_ids = PlaylistChannel.objects.filter(playlist=playlist).values_list('provider_stream_id', flat=True)
+        query = query.exclude(id__in=assigned_stream_ids)
+
+        # Apply filters if provided
+        provider_id = request.query_params.get('provider_id')
+        if provider_id:
+            query = query.filter(provider_id=provider_id)
+
+        is_active = request.query_params.get('is_active')
+        if is_active is not None:
+            is_active_bool = is_active.lower() == 'true'
+            query = query.filter(is_active=is_active_bool)
+
+        q = request.query_params.get('q')
+        if q:
+            query = query.filter(Q(title__icontains=q) | Q(tvg_id__icontains=q) | Q(group__icontains=q))
+
+        # If no sort fields, use default
+        if not order_by_fields:
+            order_by_fields = ['group', 'title']
+
+        query = query.select_related('provider').order_by(*order_by_fields)
+
+        # Get total count
+        total_items = query.count()
+
+        # Calculate pagination values
+        total_pages = ceil(total_items / size) if total_items > 0 else 1
+        skip = (page - 1) * size
+
+        # Get the streams for the current page
+        streams = query[skip:skip+size]
+
+        # Create response with pagination links
+        base_url = request.build_absolute_uri().split('?')[0]
+        query_params = request.query_params.copy()
+
+        # Remove page from query params for building links
+        if 'page' in query_params:
+            del query_params['page']
+
+        # Build query string for links
+        query_string = '&'.join([f"{k}={v}" for k, v in query_params.items()])
+        query_prefix = '?' + query_string + '&' if query_string else '?'
+
+        response_data = {
+            'page': page,
+            'total': total_items,
+            'items': ProviderStreamWithDetailsSerializer(streams, many=True).data,
+            'links': {}
+        }
+
+        # Add pagination links
+        if page > 1:
+            response_data['links']['first'] = f"{base_url}{query_prefix}page=1"
+            response_data['links']['previous'] = f"{base_url}{query_prefix}page={page - 1}"
+
+        if page < total_pages:
+            response_data['links']['next'] = f"{base_url}{query_prefix}page={page + 1}"
+            response_data['links']['last'] = f"{base_url}{query_prefix}page={total_pages}"
+
         return Response(response_data, status=status.HTTP_200_OK)
 
 
