@@ -1,7 +1,7 @@
 ﻿from rest_framework import serializers
 from .models import Playlist, PlaylistChannel
-from provider_manager.models import ProviderChannel
-from provider_manager.serializers import ProviderChannelSerializer
+from provider_manager.models import ProviderStream
+from provider_manager.serializers import ProviderStreamSerializer
 
 
 class PlaylistSerializer(serializers.ModelSerializer):
@@ -26,7 +26,7 @@ class PlaylistSerializer(serializers.ModelSerializer):
         """
         Get the number of deactivated channels associated with this Playlist.
         """
-        return obj.channels.filter(provider_channel__is_active=False).count()
+        return obj.channels.filter(provider_stream__is_active=False).count()
 
 
 class PlaylistCreateSerializer(serializers.ModelSerializer):
@@ -77,18 +77,18 @@ class ProviderWithDetailsSerializer(serializers.ModelSerializer):
     Serializer for Provider model with minimal details.
     """
     class Meta:
-        model = ProviderChannel.provider.field.related_model
+        model = ProviderStream.provider.field.related_model
         fields = ['id', 'name', 'is_enabled']
 
 
-class ProviderChannelWithDetailsSerializer(serializers.ModelSerializer):
+class ProviderStreamWithDetailsSerializer(serializers.ModelSerializer):
     """
-    Serializer for ProviderChannel model with provider details.
+    Serializer for ProviderStream model with provider details.
     """
     provider = ProviderWithDetailsSerializer(read_only=True)
 
     class Meta:
-        model = ProviderChannel
+        model = ProviderStream
         fields = ['id', 'title', 'tvg_id', 'media_url', 'logo_url', 'group', 'is_active', 'provider']
 
 
@@ -96,12 +96,12 @@ class PlaylistChannelSerializer(serializers.ModelSerializer):
     """
     Serializer for PlaylistChannel model.
     """
-    provider_channel = ProviderChannelWithDetailsSerializer(read_only=True)
+    provider_stream = ProviderStreamWithDetailsSerializer(read_only=True)
     num = serializers.SerializerMethodField()
 
     class Meta:
         model = PlaylistChannel
-        fields = ['id', 'title', 'tvg_id', 'category', 'logo_url', 'provider_channel', 'created_at', 'updated_at', 'num', 'order']
+        fields = ['id', 'title', 'tvg_id', 'category', 'logo_url', 'provider_stream', 'created_at', 'updated_at', 'num', 'order']
         read_only_fields = ['id', 'created_at', 'updated_at', 'num']
 
     def get_num(self, obj):
@@ -116,11 +116,11 @@ class PlaylistChannelCreateSerializer(serializers.ModelSerializer):
     Serializer for creating a PlaylistChannel.
     """
     title = serializers.CharField(required=False)
-    provider_channel_id = serializers.IntegerField(required=True)
+    provider_stream_id = serializers.IntegerField(required=True)
 
     class Meta:
         model = PlaylistChannel
-        fields = ['title', 'tvg_id', 'category', 'logo_url', 'provider_channel_id']
+        fields = ['title', 'tvg_id', 'category', 'logo_url', 'provider_stream_id']
 
     def validate_title(self, value):
         if not value.strip():
@@ -132,11 +132,11 @@ class PlaylistChannelCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("TVG ID cannot be empty.")
         return value
 
-    def validate_provider_channel_id(self, value):
+    def validate_provider_stream_id(self, value):
         try:
-            ProviderChannel.objects.get(pk=value)
-        except ProviderChannel.DoesNotExist:
-            raise serializers.ValidationError("Provider channel does not exist.")
+            ProviderStream.objects.get(pk=value)
+        except ProviderStream.DoesNotExist:
+            raise serializers.ValidationError("Provider stream does not exist.")
         return value
 
 
@@ -145,12 +145,12 @@ class PlaylistChannelUpdateSerializer(serializers.ModelSerializer):
     Serializer for updating a PlaylistChannel.
     """
     title = serializers.CharField(required=False)
-    provider_channel_id = serializers.IntegerField(required=False)
+    provider_stream_id = serializers.IntegerField(required=False)
     order = serializers.IntegerField(required=False)
 
     class Meta:
         model = PlaylistChannel
-        fields = ['title', 'tvg_id', 'category', 'logo_url', 'provider_channel_id', 'order']
+        fields = ['title', 'tvg_id', 'category', 'logo_url', 'provider_stream_id', 'order']
 
     def validate_title(self, value):
         if not value.strip():
@@ -162,11 +162,11 @@ class PlaylistChannelUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("TVG ID cannot be empty.")
         return value
 
-    def validate_provider_channel_id(self, value):
+    def validate_provider_stream_id(self, value):
         try:
-            ProviderChannel.objects.get(pk=value)
-        except ProviderChannel.DoesNotExist:
-            raise serializers.ValidationError("Provider channel does not exist.")
+            ProviderStream.objects.get(pk=value)
+        except ProviderStream.DoesNotExist:
+            raise serializers.ValidationError("Provider stream does not exist.")
         return value
 
     def validate_order(self, value):

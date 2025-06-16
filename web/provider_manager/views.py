@@ -5,12 +5,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from math import ceil
 
-from .models import Provider, ProviderChannel, ProviderSyncJob, JobState
+from .models import Provider, ProviderStream, ProviderSyncJob, JobState
 from .serializers import (
     ProviderSerializer,
     ProviderCreateSerializer,
     ProviderUpdateSerializer,
-    ProviderChannelSerializer,
+    ProviderStreamSerializer,
     ProviderSyncJobSerializer
 )
 from main.utils import ConfigStore
@@ -57,7 +57,7 @@ class ProvidersViewSet(viewsets.ViewSet):
         job = provider.jobs.create(
             state=JobState.QUEUED,
             max_attempts=1, # when running manual sync, allow one failure only
-            allow_channel_auto_deletion=settings_data.get("allow_channel_auto_deletion")
+            allow_stream_auto_deletion=settings_data.get("allow_stream_auto_deletion")
         )
 
         job.save()
@@ -276,15 +276,15 @@ class ProvidersViewSet(viewsets.ViewSet):
         return Response(response_data)
 
 
-class ProviderChannelsViewSet(viewsets.ViewSet):
+class ProviderStreamsViewSet(viewsets.ViewSet):
     """
-    API endpoint for provider channels.
+    API endpoint for provider streams.
     Based on IPTV.PlaylistManager/Controllers/ChannelsControllers.cs
     """
 
     def list(self, request, provider_id=None):
         """
-        Get channels for a specific provider with pagination.
+        Get streams for a specific provider with pagination.
         """
         # Validate pagination parameters
         page = int(request.query_params.get('page', 1))
@@ -305,16 +305,16 @@ class ProviderChannelsViewSet(viewsets.ViewSet):
         # Check if provider exists
         provider = get_object_or_404(Provider, pk=provider_id)
 
-        # Get total count of channels for this provider
-        query = ProviderChannel.objects.filter(provider=provider)
+        # Get total count of streams for this provider
+        query = ProviderStream.objects.filter(provider=provider)
         total_items = query.count()
 
         # Calculate pagination values
         total_pages = ceil(total_items / size)
         skip = (page - 1) * size
 
-        # Get the channels for the current page
-        channels = query.order_by('group', 'title')[skip:skip+size]
+        # Get the streams for the current page
+        streams = query.order_by('group', 'title')[skip:skip+size]
 
         # Create response with pagination links
         base_url = request.build_absolute_uri().split('?')[0]
@@ -322,7 +322,7 @@ class ProviderChannelsViewSet(viewsets.ViewSet):
         response_data = {
             'page': page,
             'total': total_items,
-            'items': ProviderChannelSerializer(channels, many=True).data,
+            'items': ProviderStreamSerializer(streams, many=True).data,
             'links': {}
         }
 

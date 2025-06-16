@@ -15,18 +15,18 @@
     .modal-backdrop {
         opacity: 0.5;
     }
-    .channel-count-link {
+    .stream-count-link {
         color: #0d6efd;
         cursor: pointer;
         text-decoration: underline;
     }
-    .channel-count-link:hover {
+    .stream-count-link:hover {
         color: #0a58ca;
     }
-    .inactive-channel {
+    .inactive-stream {
         opacity: 0.5;
     }
-    .channel-logo {
+    .stream-logo {
         max-width: 40px;
         max-height: 40px;
         margin-right: 10px;
@@ -151,8 +151,8 @@
             </div>
 
             <div class="mb-3 form-check">
-                <input type="checkbox" class="form-check-input" id="allowChannelAutoDeletion" v-model="settings.allow_channel_auto_deletion" @change="onSettingsChange">
-                <label class="form-check-label" for="allowChannelAutoDeletion">Allow Channel Auto-Deletion</label>
+                <input type="checkbox" class="form-check-input" id="allowStreamAutoDeletion" v-model="settings.allow_stream_auto_deletion" @change="onSettingsChange">
+                <label class="form-check-label" for="allowStreamAutoDeletion">Allow Stream Auto-Deletion</label>
             </div>
 
             <div class="mb-3">
@@ -163,7 +163,7 @@
                         <option :value="null">Unlimited</option>
                     </select>
                 </div>
-                <div class="form-text">Maximum number of retry attempts for failed sync jobs. Select "Unlimited" for no limit.</div>
+                <div class="form-text">Maximum number of retry attempts for failed scheduled sync jobs. Select "Unlimited" for no limit.</div>
             </div>
         </div>
     </div>
@@ -209,11 +209,11 @@
                         <strong>URL:</strong> <a :href="provider.url" target="_blank" class="url-ellipsis">[[ provider.url ]]</a>
                     </p>
                     <p class="card-text">
-                        <strong>Channels:</strong> 
-                        <span v-if="provider.channel_count > 0"
-                              class="channel-count-link" 
-                              @click="showChannelsModal(provider)">
-                            [[ provider.channel_count ]]
+                        <strong>Streams:</strong>
+                        <span v-if="provider.stream_count > 0"
+                              class="stream-count-link"
+                              @click="showStreamsModal(provider)">
+                            [[ provider.stream_count ]]
                         </span>
                         <span v-else>[[ 0 ]]</span>
                         <br>
@@ -305,28 +305,28 @@
         </div>
     </div>
 
-    <!-- Channels List Modal -->
-    <div class="modal fade channel-list-modal" id="channelsModal" tabindex="-1" aria-labelledby="channelsModalLabel" aria-hidden="true">
+    <!-- Streams List Modal -->
+    <div class="modal fade stream-list-modal" id="streamsModal" tabindex="-1" aria-labelledby="streamsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="channelsModalLabel">Channels for "[[ currentProvider.name ]]"</h5>
+                    <h5 class="modal-title" id="streamsModalLabel">Streams for "[[ currentProvider.name ]]"</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div v-if="channelsLoading" class="text-center p-4">
+                    <div v-if="streamsLoading" class="text-center p-4">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
-                        <p class="mt-3">Loading channels...</p>
+                        <p class="mt-3">Loading streams...</p>
                     </div>
 
-                    <div v-else-if="channelsError" class="alert alert-danger">
-                        [[ channelsError ]]
+                    <div v-else-if="streamsError" class="alert alert-danger">
+                        [[ streamsError ]]
                     </div>
 
-                    <div v-else-if="channels.length === 0" class="alert alert-info">
-                        No channels found for this provider.
+                    <div v-else-if="streams.length === 0" class="alert alert-info">
+                        No streams found for this provider.
                     </div>
 
                     <div v-else>
@@ -343,21 +343,21 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="channel in channels" :key="channel.id" :class="{'inactive-channel': !channel.is_active}">
+                                    <tr v-for="stream in streams" :key="stream.id" :class="{'inactive-stream': !stream.is_active}">
                                         <td>
-                                            <img v-if="channel.logo_url" :src="channel.logo_url" class="channel-logo" @error="handleLogoError">
+                                            <img v-if="stream.logo_url" :src="stream.logo_url" class="stream-logo" @error="handleLogoError">
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
-                                                [[ channel.title ]]
+                                                [[ stream.title ]]
                                             </div>
                                         </td>
-                                        <td>[[ channel.tvg_id ]]</td>
-                                        <td>[[ channel.group ]]</td>
-                                        <td>[[ formatDate(channel.updated_at) ]]</td>
+                                        <td>[[ stream.tvg_id ]]</td>
+                                        <td>[[ stream.group ]]</td>
+                                        <td>[[ formatDate(stream.updated_at) ]]</td>
                                         <td>
-                                            <button class="btn btn-sm btn-outline-primary" @click="copyStreamUrl(channel.media_url, $event)">
-                                                Stream <i class="bi bi-clipboard"></i>
+                                            <button class="btn btn-sm btn-outline-primary" @click="copyStreamUrl(stream.media_url, $event)">
+                                                Stream URL <i class="bi bi-clipboard"></i>
                                             </button>
                                         </td>
                                     </tr>
@@ -366,25 +366,25 @@
                         </div>
 
                         <!-- Pagination -->
-                        <div class="pagination-container" v-if="channelsTotalPages > 1">
-                            <nav aria-label="Channel list pagination">
+                        <div class="pagination-container" v-if="streamsTotalPages > 1">
+                            <nav aria-label="Stream list pagination">
                                 <ul class="pagination">
-                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === 1 }">
-                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(1)">First</a>
+                                    <li class="page-item" :class="{ disabled: streamsCurrentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="loadStreamsPage(1)">First</a>
                                     </li>
-                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === 1 }">
-                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(channelsCurrentPage - 1)">Previous</a>
-                                    </li>
-
-                                    <li v-for="page in paginationPages" :key="page" class="page-item" :class="{ active: channelsCurrentPage === page }">
-                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(page)">[[ page ]]</a>
+                                    <li class="page-item" :class="{ disabled: streamsCurrentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="loadStreamsPage(streamsCurrentPage - 1)">Previous</a>
                                     </li>
 
-                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === channelsTotalPages }">
-                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(channelsCurrentPage + 1)">Next</a>
+                                    <li v-for="page in paginationPages" :key="page" class="page-item" :class="{ active: streamsCurrentPage === page }">
+                                        <a class="page-link" href="#" @click.prevent="loadStreamsPage(page)">[[ page ]]</a>
                                     </li>
-                                    <li class="page-item" :class="{ disabled: channelsCurrentPage === channelsTotalPages }">
-                                        <a class="page-link" href="#" @click.prevent="loadChannelsPage(channelsTotalPages)">Last</a>
+
+                                    <li class="page-item" :class="{ disabled: streamsCurrentPage === streamsTotalPages }">
+                                        <a class="page-link" href="#" @click.prevent="loadStreamsPage(streamsCurrentPage + 1)">Next</a>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: streamsCurrentPage === streamsTotalPages }">
+                                        <a class="page-link" href="#" @click.prevent="loadStreamsPage(streamsTotalPages)">Last</a>
                                     </li>
                                 </ul>
                             </nav>
@@ -549,7 +549,7 @@
                 id: null,
                 name: '',
                 url: '',
-                channel_count: 0,
+                stream_count: 0,
                 created_at: null,
                 updated_at: null,
                 last_sync_started_at: null
@@ -559,15 +559,15 @@
             formSubmitting: false,
             providerModal: null,
             deleteModal: null,
-            channelsModal: null,
+            streamsModal: null,
             jobHistoryModal: null,
-            // Channels data
-            channels: [],
-            channelsLoading: false,
-            channelsError: null,
-            channelsCurrentPage: 1,
-            channelsTotalPages: 1,
-            channelsPageSize: 10,
+            // Streams data
+            streams: [],
+            streamsLoading: false,
+            streamsError: null,
+            streamsCurrentPage: 1,
+            streamsTotalPages: 1,
+            streamsPageSize: 10,
             // Jobs data
             jobs: [],
             activeJobs: [],
@@ -583,7 +583,7 @@
             settings: {
                 sync_enabled: false,
                 sync_schedules: [],
-                allow_channel_auto_deletion: true,
+                allow_stream_auto_deletion: true,
                 sync_job_max_attempts: 3
             },
             settingsStatus: 'idle', // idle, modified, saving, saved
@@ -596,7 +596,7 @@
             this.fetchSettings();
             this.providerModal = new bootstrap.Modal(document.getElementById('providerModal'));
             this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-            this.channelsModal = new bootstrap.Modal(document.getElementById('channelsModal'));
+            this.streamsModal = new bootstrap.Modal(document.getElementById('streamsModal'));
             this.jobHistoryModal = new bootstrap.Modal(document.getElementById('jobHistoryModal'));
 
             // Connect to active jobs WebSocket
@@ -611,8 +611,8 @@
             paginationPages() {
                 // Generate an array of page numbers to display in pagination
                 // Show at most 5 pages, centered around the current page
-                const totalPages = this.channelsTotalPages;
-                const currentPage = this.channelsCurrentPage;
+                const totalPages = this.streamsTotalPages;
+                const currentPage = this.streamsCurrentPage;
 
                 if (totalPages <= 5) {
                     // If there are 5 or fewer pages, show all of them
@@ -1036,8 +1036,8 @@
                 this.onSettingsChange();
             },
 
-            // Channel list methods
-            showChannelsModal(provider) {
+            // Stream list methods
+            showStreamsModal(provider) {
                 // Set current provider
                 this.currentProvider = {
                     id: provider.id,
@@ -1045,41 +1045,41 @@
                     url: provider.url
                 };
 
-                // Reset channels data
-                this.channels = [];
-                this.channelsCurrentPage = 1;
-                this.channelsTotalPages = 1;
-                this.channelsError = null;
+                // Reset streams data
+                this.streams = [];
+                this.streamsCurrentPage = 1;
+                this.streamsTotalPages = 1;
+                this.streamsError = null;
 
                 // Show modal
-                this.channelsModal.show();
+                this.streamsModal.show();
 
-                // Load first page of channels
-                this.loadChannelsPage(1);
+                // Load first page of streams
+                this.loadStreamsPage(1);
             },
 
-            loadChannelsPage(page) {
-                this.channelsLoading = true;
-                this.channelsError = null;
+            loadStreamsPage(page) {
+                this.streamsLoading = true;
+                this.streamsError = null;
 
-                // Fetch channels for the specified page
-                axios.get(`/api/providers/${this.currentProvider.id}/channels/`, {
+                // Fetch streams for the specified page
+                axios.get(`/api/providers/${this.currentProvider.id}/streams/`, {
                     params: {
                         page: page,
-                        size: this.channelsPageSize
+                        size: this.streamsPageSize
                     }
                 })
                 .then(response => {
-                    // Update channels data
-                    this.channels = response.data.items;
-                    this.channelsCurrentPage = response.data.page;
-                    this.channelsTotalPages = Math.ceil(response.data.total / this.channelsPageSize);
-                    this.channelsLoading = false;
+                    // Update streams data
+                    this.streams = response.data.items;
+                    this.streamsCurrentPage = response.data.page;
+                    this.streamsTotalPages = Math.ceil(response.data.total / this.streamsPageSize);
+                    this.streamsLoading = false;
                 })
                 .catch(error => {
-                    console.error('Error fetching channels:', error);
-                    this.channelsError = 'Failed to load channels. Please try again.';
-                    this.channelsLoading = false;
+                    console.error('Error fetching streams:', error);
+                    this.streamsError = 'Failed to load streams. Please try again.';
+                    this.streamsLoading = false;
                 });
             },
 

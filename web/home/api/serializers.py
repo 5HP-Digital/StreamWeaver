@@ -33,7 +33,7 @@ class SettingsSerializer(serializers.Serializer):
         default=list
     )
     sync_job_max_attempts = serializers.IntegerField(default=3, min_value=1, max_value=100, allow_null=True)
-    allow_channel_auto_deletion = serializers.BooleanField(default=True)
+    allow_stream_auto_deletion = serializers.BooleanField(default=True)
 
     def create(self, validated_data):
         """Not used for this serializer."""

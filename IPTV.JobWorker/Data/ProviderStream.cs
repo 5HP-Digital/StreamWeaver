@@ -1,6 +1,6 @@
 ﻿namespace IPTV.JobWorker.Data;
 
-public class ProviderChannel : ITimestampable
+public class ProviderStream : ITimestampable
 {
     public long Id { get; set; }
     public required string Title { get; set; }

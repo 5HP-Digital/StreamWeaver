@@ -1,25 +1,25 @@
 ﻿from rest_framework import serializers
-from .models import Provider, ProviderChannel, ProviderSyncJob, JobState
+from .models import Provider, ProviderStream, ProviderSyncJob, JobState
 
 
 class ProviderSerializer(serializers.ModelSerializer):
     """
     Serializer for Provider model.
     """
-    channel_count = serializers.SerializerMethodField()
+    stream_count = serializers.SerializerMethodField()
     last_synced = serializers.SerializerMethodField()
     active_job_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Provider
-        fields = ['id', 'name', 'url', 'is_enabled', 'created_at', 'updated_at', 'channel_count', 'last_synced', 'active_job_id']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'channel_count', 'last_synced', 'active_job_id']
+        fields = ['id', 'name', 'url', 'is_enabled', 'created_at', 'updated_at', 'stream_count', 'last_synced', 'active_job_id']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'stream_count', 'last_synced', 'active_job_id']
 
-    def get_channel_count(self, obj):
+    def get_stream_count(self, obj):
         """
-        Get the number of channels associated with this Provider.
+        Get the number of streams associated with this Provider.
         """
-        return obj.channels.count()
+        return obj.streams.count()
 
     def get_last_synced(self, obj):
         """
@@ -62,12 +62,12 @@ class ProviderUpdateSerializer(serializers.ModelSerializer):
         fields = ['name', 'url', 'is_enabled']
 
 
-class ProviderChannelSerializer(serializers.ModelSerializer):
+class ProviderStreamSerializer(serializers.ModelSerializer):
     """
-    Serializer for ProviderChannel model.
+    Serializer for ProviderStream model.
     """
     class Meta:
-        model = ProviderChannel
+        model = ProviderStream
         fields = ['id', 'title', 'tvg_id', 'media_url', 'logo_url', 'group', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 

@@ -10,7 +10,7 @@ public class ProviderSynchronizer(
     IHttpClientFactory httpClientFactory, 
     ILogger<ProviderSynchronizer> logger)
 {
-    public async Task<(bool, string?)> Run(Provider provider, bool allowChannelAutoDeletion, CancellationToken cancellationToken)
+    public async Task<(bool, string?)> Run(Provider provider, bool allowStreamAutoDeletion, CancellationToken cancellationToken)
     {
         if (!provider.IsEnabled)
         {
@@ -28,54 +28,54 @@ public class ProviderSynchronizer(
             document = await Serializer.DeserializeAsync(stream, cancellationToken);
         }
         
-        logger.LogInformation("Document with {ChannelCount} channels retrieved from {ProviderUrl}", document.Channels.Count, provider.Url);
+        logger.LogInformation("Document with {StreamCount} streams retrieved from {ProviderUrl}", document.Channels.Count, provider.Url);
         
-        // Index existing channels for the provider
-        var existingChannels = new HybridDictionary(provider.Channels.Count);
-        foreach (var channel in provider.Channels)
+        // Index existing streams for the provider
+        var existingStreams = new HybridDictionary(provider.Streams.Count);
+        foreach (var stream in provider.Streams)
         {
-            existingChannels.Add((channel.Title, channel.Group), channel);
+            existingStreams.Add((stream.Title, stream.Group), stream);
         }
         
-        logger.LogInformation("{ChannelCount} existing channels indexed", provider.Channels.Count);
+        logger.LogInformation("{StreamCount} existing streams indexed", provider.Streams.Count);
         
-        // Track which channels were processed
-        var processedChannels = new HashSet<(string Title, string? Group)>();
+        // Track which streams were processed
+        var processedStreams = new HashSet<(string Title, string? Group)>();
         
-        // Sync channels
+        // Sync streams
         var added = 0;
         var updated = 0;
         foreach (var channel in document.Channels)
         {
             var key = (channel.Title, channel.GroupTitle);
             
-            // Skip channels without a title or media URL
+            // Skip streams without a title or media URL
             if (string.IsNullOrWhiteSpace(channel.Title) || string.IsNullOrWhiteSpace(channel.MediaUrl))
                 continue;
             
-            // Skip duplicate channels
-            // Currently, we don't support multiple channels with the same title and group
-            if (processedChannels.Contains(key))
+            // Skip duplicate streams
+            // Currently, we don't support multiple streams with the same title and group
+            if (processedStreams.Contains(key))
                 continue;
             
-            // Check if the channel already exists
-            if (existingChannels.Contains(key))
+            // Check if the stream already exists
+            if (existingStreams.Contains(key))
             {
-                // Update existing channel
-                var channelToUpdate = (ProviderChannel)existingChannels[key]!;
-                channelToUpdate.Title = channel.Title;
-                channelToUpdate.TvgId = channel.TvgId;
-                channelToUpdate.MediaUrl = channel.MediaUrl;
-                channelToUpdate.LogoUrl = channel.LogoUrl;
-                channelToUpdate.Group = channel.GroupTitle;
-                channelToUpdate.IsActive = true;
+                // Update existing stream
+                var streamToUpdate = (ProviderStream)existingStreams[key]!;
+                streamToUpdate.Title = channel.Title;
+                streamToUpdate.TvgId = channel.TvgId;
+                streamToUpdate.MediaUrl = channel.MediaUrl;
+                streamToUpdate.LogoUrl = channel.LogoUrl;
+                streamToUpdate.Group = channel.GroupTitle;
+                streamToUpdate.IsActive = true;
                 
                 updated++;
             }
             else
             {
-                // Create a new channel
-                provider.Channels.Add(new ProviderChannel
+                // Create a new stream
+                provider.Streams.Add(new ProviderStream
                 {
                     Title = channel.Title,
                     TvgId = channel.TvgId,
@@ -89,38 +89,38 @@ public class ProviderSynchronizer(
             }
             
             // Mark as processed
-            processedChannels.Add(key);
+            processedStreams.Add(key);
         }
         
-        logger.LogInformation("{Updated} channels updated; {Added} channels added", updated, added);
+        logger.LogInformation("{Updated} streams updated; {Added} streams added", updated, added);
         
-        // Handle channels that weren't in the m3u file
+        // Handle streams that weren't in the m3u file
         var deleted = 0;
-        foreach (var channel in from DictionaryEntry entry in existingChannels 
+        foreach (var stream in from DictionaryEntry entry in existingStreams 
                  let key = ((string Title, string? Group))entry.Key 
-                 let channel = (ProviderChannel)entry.Value! 
-                 where !processedChannels.Contains(key) 
-                 select channel)
+                 let stream = (ProviderStream)entry.Value! 
+                 where !processedStreams.Contains(key) 
+                 select stream)
         {
-            if (allowChannelAutoDeletion)
+            if (allowStreamAutoDeletion)
             {
-                // Delete channel
-                provider.Channels.Remove(channel);
+                // Delete stream
+                provider.Streams.Remove(stream);
             }
             else
             {
                 // Mark as inactive
-                channel.IsActive = false;
+                stream.IsActive = false;
             }
             
             deleted++;
         }
         
-        logger.LogInformation("{Deleted} channels deleted", deleted);
+        logger.LogInformation("{Deleted} streams deleted", deleted);
         
         // Save changes
         await workerContext.SaveChangesAsync(cancellationToken: cancellationToken);
         
-        return (true, $"Service provider channels synced: {added} added; {updated} updated; {deleted} deleted");
+        return (true, $"Service provider streams synced: {added} added; {updated} updated; {deleted} deleted");
     }
 }

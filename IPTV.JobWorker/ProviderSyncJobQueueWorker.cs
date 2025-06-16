@@ -57,7 +57,7 @@ public class ProviderSyncJobQueueWorker(
                     var start = timeProvider.GetTimestamp();
                     
                     var providerSynchronizer = scope.ServiceProvider.GetRequiredService<ProviderSynchronizer>();
-                    var (success, description) = await providerSynchronizer.Run(job.Provider, job.AllowChannelAutoDeletion, cancellationToken: stoppingToken);
+                    var (success, description) = await providerSynchronizer.Run(job.Provider, job.AllowStreamAutoDeletion, cancellationToken: stoppingToken);
 
                     // retry on exception only, graceful unsuccessful processing fails the job
                     job.State = success ? JobState.Completed : JobState.Failed;

@@ -200,21 +200,21 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="channel in channels" :key="channel.id" :class="{'inactive-channel': !channel.provider_channel.is_active}">
+                                    <tr v-for="channel in channels" :key="channel.id" :class="{'inactive-channel': !channel.provider_stream.is_active}">
                                         <td>
-                                            <img v-if="channel.logo_url || channel.provider_channel.logo_url" 
-                                                 :src="channel.logo_url || channel.provider_channel.logo_url" 
+                                            <img v-if="channel.logo_url || channel.provider_stream.logo_url" 
+                                                 :src="channel.logo_url || channel.provider_stream.logo_url" 
                                                  class="channel-logo" 
                                                  @error="handleLogoError">
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
-                                                [[ channel.title || channel.provider_channel.title ]]
+                                                [[ channel.title || channel.provider_stream.title ]]
                                             </div>
                                         </td>
                                         <td>[[ channel.category ]]</td>
-                                        <td>[[ channel.tvg_id || channel.provider_channel.tvg_id ]]</td>
-                                        <td>[[ channel.provider_channel.provider.name ]]</td>
+                                        <td>[[ channel.tvg_id || channel.provider_stream.tvg_id ]]</td>
+                                        <td>[[ channel.provider_stream.provider.name ]]</td>
                                         <td>[[ formatDate(channel.updated_at) ]]</td>
                                     </tr>
                                 </tbody>
@@ -280,7 +280,7 @@
             formSubmitting: false,
             playlistModal: null,
             deleteModal: null,
-            channelsModal: null,
+            streamsModal: null,
             // Channels data
             channels: [],
             channelsLoading: false,
@@ -293,7 +293,7 @@
             this.fetchPlaylists();
             this.playlistModal = new bootstrap.Modal(document.getElementById('playlistModal'));
             this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-            this.channelsModal = new bootstrap.Modal(document.getElementById('channelsModal'));
+            this.streamsModal = new bootstrap.Modal(document.getElementById('channelsModal'));
         },
         computed: {
             paginationPages() {
@@ -415,7 +415,7 @@
                 this.channelsError = null;
 
                 // Show modal
-                this.channelsModal.show();
+                this.streamsModal.show();
 
                 // Load first page of channels
                 this.loadChannelsPage(1);

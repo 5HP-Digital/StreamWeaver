@@ -16,7 +16,7 @@ public class ProviderSyncJob : ITimestampable
     
     public int? MaxAttempts { get; set; }
 
-    public bool AllowChannelAutoDeletion { get; set; } = true;
+    public bool AllowStreamAutoDeletion { get; set; } = true;
 
     public DateTime CreatedAt { get; set; }
 

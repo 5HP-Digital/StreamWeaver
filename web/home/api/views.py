@@ -83,7 +83,7 @@ class SettingsView(APIView):
             settings_data = {
                 "sync_enabled": False,
                 "sync_schedules": [],
-                "allow_channel_auto_deletion": True,
+                "allow_stream_auto_deletion": True,
                 "sync_job_max_attempts": 3
             }
             # Save default settings to config store

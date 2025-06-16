@@ -1,6 +1,6 @@
 ﻿from django.db import models
 from django.core.validators import URLValidator
-from provider_manager.models import ProviderChannel
+from provider_manager.models import ProviderStream
 
 
 class Playlist(models.Model):
@@ -30,8 +30,8 @@ class PlaylistChannel(models.Model):
         on_delete=models.CASCADE,
         related_name='channels'
     )
-    provider_channel = models.ForeignKey(
-        ProviderChannel,
+    provider_stream = models.ForeignKey(
+        ProviderStream,
         on_delete=models.CASCADE,
         related_name='playlist_channels'
     )
@@ -45,8 +45,8 @@ class PlaylistChannel(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(fields=['playlist', 'order'], name='unique_playlist_channel_order'),
-            models.UniqueConstraint(fields=['playlist', 'provider_channel'], name='unique_playlist_channel_provider_channel')
+            models.UniqueConstraint(fields=['playlist', 'provider_stream'], name='unique_playlist_channel_provider_stream')
         ]
 
     def __str__(self):
-        return self.title or self.provider_channel.title
+        return self.title or self.provider_stream.title

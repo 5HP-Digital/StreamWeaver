@@ -153,7 +153,7 @@ class PlaylistsViewSet(viewsets.ViewSet):
             serializer = PlaylistChannelCreateSerializer(data=request.data)
             if serializer.is_valid():
                 # Get the provider channel
-                provider_channel_id = serializer.validated_data['provider_channel_id']
+                provider_stream_id = serializer.validated_data['provider_stream_id']
 
                 # Get the maximum order value and add 1, or use 1 if no records exist
                 max_order = PlaylistChannel.objects.filter(playlist=playlist).aggregate(Max('order'))['order__max']
@@ -166,7 +166,7 @@ class PlaylistsViewSet(viewsets.ViewSet):
                     category=serializer.validated_data.get('category'),
                     logo_url=serializer.validated_data.get('logo_url'),
                     playlist=playlist,
-                    provider_channel_id=provider_channel_id,
+                    provider_stream_id=provider_stream_id,
                     order=new_order
                 )
 
@@ -213,8 +213,8 @@ class ChannelsViewSet(viewsets.ViewSet):
                 channel.category = serializer.validated_data['category']
             if 'logo_url' in serializer.validated_data:
                 channel.logo_url = serializer.validated_data['logo_url']
-            if 'provider_channel_id' in serializer.validated_data:
-                channel.provider_channel_id = serializer.validated_data['provider_channel_id']
+            if 'provider_stream_id' in serializer.validated_data:
+                channel.provider_stream_id = serializer.validated_data['provider_stream_id']
             if 'order' in serializer.validated_data:
                 new_order = serializer.validated_data['order']
 

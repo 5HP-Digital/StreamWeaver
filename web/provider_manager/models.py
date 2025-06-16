@@ -41,7 +41,7 @@ class ProviderSyncJob(models.Model):
     last_attempt_started_at = models.DateTimeField(null=True, blank=True)
     attempt_count = models.IntegerField(default=0)
     max_attempts = models.IntegerField(null=True, blank=True)
-    allow_channel_auto_deletion = models.BooleanField(default=True)
+    allow_stream_auto_deletion = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     provider = models.ForeignKey(
@@ -54,14 +54,14 @@ class ProviderSyncJob(models.Model):
         return f"ProviderSyncJob {self.job_id} - {self.state}"
 
 
-class ProviderChannel(models.Model):
+class ProviderStream(models.Model):
     """
-    Model representing a channel within a provider.
+    Model representing a stream within a provider.
     """
     provider = models.ForeignKey(
         Provider, 
         on_delete=models.CASCADE, 
-        related_name='channels'
+        related_name='streams'
     )
     title = models.CharField(max_length=255)
     tvg_id = models.CharField(max_length=255, null=True, blank=True)

@@ -33,10 +33,10 @@
         color: #ffc107;
         margin-left: 5px;
     }
-    .channel-info-popover {
+    .stream-info-popover {
         max-width: 300px;
     }
-    .channel-info-thumbnail {
+    .stream-info-thumbnail {
         max-width: 60px;
         max-height: 60px;
         margin-bottom: 10px;
@@ -96,12 +96,12 @@
                             <th>Title</th>
                             <th>TVG ID</th>
                             <th>Category</th>
-                            <th>Channel</th>
+                            <th>Stream</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="channelsTableBody">
-                        <tr v-for="channel in channels" :key="channel.id" :class="{'inactive-channel': channel.provider_channel && !channel.provider_channel.is_active}">
+                        <tr v-for="channel in channels" :key="channel.id" :class="{'inactive-channel': channel.provider_stream && !channel.provider_stream.is_active}">
                             <td>
                                 <div class="order-controls">
                                     <i v-if="currentPage > 1" class="bi bi-caret-left mx-0" @click="moveChannelPageUp(channel)" :title='"Move to Page " + (currentPage - 1)'></i>
@@ -111,16 +111,16 @@
                             </td>
                             <td>[[ channel.num ]]</td>
                             <td>
-                                <img v-if="channel.logo_url || (channel.provider_channel && channel.provider_channel.logo_url)" 
-                                     :src="channel.logo_url || (channel.provider_channel ? channel.provider_channel.logo_url : '')" 
+                                <img v-if="channel.logo_url || (channel.provider_stream && channel.provider_stream.logo_url)" 
+                                     :src="channel.logo_url || (channel.provider_stream ? channel.provider_stream.logo_url : '')" 
                                      class="channel-logo" 
                                      @error="handleLogoError">
                             </td>
-                            <td>[[ channel.title || channel.provider_channel.title ]]</td>
-                            <td>[[ channel.tvg_id || channel.provider_channel.tvg_id ]]</td>
+                            <td>[[ channel.title || channel.provider_stream.title ]]</td>
+                            <td>[[ channel.tvg_id || channel.provider_stream.tvg_id ]]</td>
                             <td>[[ channel.category ]]</td>
                             <td @click="showChannelDetails(channel, $event)" style="cursor: pointer;">
-                                <span>[[ channel.provider_channel.title ]]</span>
+                                <span>[[ channel.provider_stream.title ]]</span>
                             </td>
                             <td>
                                 <button class="btn btn-sm btn-primary me-1" @click="showEditChannelModal(channel)">
@@ -162,21 +162,21 @@
         </div>
     </div>
 
-    <!-- Channel Details Popover Template -->
+    <!-- Stream Details Popover Template -->
     <div class="d-none">
-        <div id="channelDetailsTemplate" class="channel-info-popover">
-            <div v-if="selectedChannel && selectedChannel.provider_channel">
-                <img v-if="selectedChannel.provider_channel.logo_url" 
-                     :src="selectedChannel.provider_channel.logo_url" 
-                     class="channel-info-thumbnail" 
+        <div id="streamDetailsTemplate" class="stream-info-popover">
+            <div v-if="selectedChannel && selectedChannel.provider_stream">
+                <img v-if="selectedChannel.provider_stream.logo_url" 
+                     :src="selectedChannel.provider_stream.logo_url" 
+                     class="stream-info-thumbnail" 
                      @error="handleLogoError">
-                <p><strong>Title:</strong> [[ selectedChannel.provider_channel.title ]]</p>
-                <p><strong>TVG ID:</strong> [[ selectedChannel.provider_channel.tvg_id ]]</p>
-                <p><strong>Group:</strong> [[ selectedChannel.provider_channel.group ]]</p>
+                <p><strong>Title:</strong> [[ selectedChannel.provider_stream.title ]]</p>
+                <p><strong>TVG ID:</strong> [[ selectedChannel.provider_stream.tvg_id ]]</p>
+                <p><strong>Group:</strong> [[ selectedChannel.provider_stream.group ]]</p>
                 <p>
                     <strong>Provider:</strong> 
-                    [[ selectedChannel.provider_channel.provider.name ]]
-                    <i v-if="selectedChannel.provider_channel.provider && !selectedChannel.provider_channel.provider.is_enabled" 
+                    [[ selectedChannel.provider_stream.provider.name ]]
+                    <i v-if="selectedChannel.provider_stream.provider && !selectedChannel.provider_stream.provider.is_enabled" 
                        class="bi bi-exclamation-triangle-fill warning-icon" 
                        title="Provider is disabled"></i>
                 </p>
@@ -232,13 +232,13 @@
                             <div class="form-text">Required</div>
                         </div>
                         <div class="mb-3">
-                            <label for="channelProviderChannel" class="form-label">Provider Channel</label>
+                            <label for="channelProviderStream" class="form-label">Stream</label>
                             <div class="input-group">
-                                <input type="text" class="form-control" id="channelProviderChannel" 
-                                       :value="selectedChannel.provider_channel ? selectedChannel.provider_channel.title : ''"
+                                <input type="text" class="form-control" id="channelProviderStream" 
+                                       :value="selectedChannel.provider_stream ? selectedChannel.provider_stream.title : ''"
                                        disabled required>
                                 <button class="btn btn-outline-secondary" type="button" 
-                                        @click="showProviderChannelsModal" 
+                                        @click="showProviderStreamsModal" 
                                         :disabled="!selectedChannelProviderId">Select...</button>
                             </div>
                             <div class="form-text">Required</div>
@@ -256,28 +256,28 @@
         </div>
     </div>
 
-    <!-- Provider Channels Modal -->
-    <div class="modal fade" id="providerChannelsModal" tabindex="-1" aria-labelledby="providerChannelsModalLabel" aria-hidden="true">
+    <!-- Provider Streams Modal -->
+    <div class="modal fade" id="providerStreamsModal" tabindex="-1" aria-labelledby="providerStreamsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="providerChannelsModalLabel">Select Provider Channel</h5>
+                    <h5 class="modal-title" id="providerStreamsModalLabel">Select Stream</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div v-if="providerChannelsLoading" class="text-center p-4">
+                    <div v-if="providerStreamsLoading" class="text-center p-4">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
-                        <p class="mt-3">Loading channels...</p>
+                        <p class="mt-3">Loading streams...</p>
                     </div>
 
-                    <div v-else-if="providerChannelsError" class="alert alert-danger">
-                        [[ providerChannelsError ]]
+                    <div v-else-if="providerStreamsError" class="alert alert-danger">
+                        [[ providerStreamsError ]]
                     </div>
 
-                    <div v-else-if="providerChannels.length === 0" class="alert alert-info">
-                        No channels found for this provider.
+                    <div v-else-if="providerStreams.length === 0" class="alert alert-info">
+                        No streams found for this provider.
                     </div>
 
                     <div v-else>
@@ -294,20 +294,20 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="channel in providerChannels" :key="channel.id" :class="{'inactive-channel': !channel.is_active}">
+                                    <tr v-for="stream in providerStreams" :key="stream.id" :class="{'inactive-channel': !stream.is_active}">
                                         <td>
-                                            <img v-if="channel.logo_url" :src="channel.logo_url" class="channel-logo" @error="handleLogoError">
+                                            <img v-if="stream.logo_url" :src="stream.logo_url" class="channel-logo" @error="handleLogoError">
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
-                                                [[ channel.title ]]
+                                                [[ stream.title ]]
                                             </div>
                                         </td>
-                                        <td>[[ channel.tvg_id ]]</td>
-                                        <td>[[ channel.group ]]</td>
-                                        <td>[[ formatDate(channel.updated_at) ]]</td>
+                                        <td>[[ stream.tvg_id ]]</td>
+                                        <td>[[ stream.group ]]</td>
+                                        <td>[[ formatDate(stream.updated_at) ]]</td>
                                         <td>
-                                            <button class="btn btn-sm btn-primary" @click="selectProviderChannel(channel)">
+                                            <button class="btn btn-sm btn-primary" @click="selectProviderStream(stream)">
                                                 Select
                                             </button>
                                         </td>
@@ -317,25 +317,25 @@
                         </div>
 
                         <!-- Pagination -->
-                        <div class="pagination-container" v-if="providerChannelsTotalPages > 1">
-                            <nav aria-label="Provider channel list pagination">
+                        <div class="pagination-container" v-if="providerStreamsTotalPages > 1">
+                            <nav aria-label="Provider stream list pagination">
                                 <ul class="pagination">
-                                    <li class="page-item" :class="{ disabled: providerChannelsCurrentPage === 1 }">
-                                        <a class="page-link" href="#" @click.prevent="loadProviderChannelsPage(1)">First</a>
+                                    <li class="page-item" :class="{ disabled: providerStreamsCurrentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="loadProviderStreamsPage(1)">First</a>
                                     </li>
-                                    <li class="page-item" :class="{ disabled: providerChannelsCurrentPage === 1 }">
-                                        <a class="page-link" href="#" @click.prevent="loadProviderChannelsPage(providerChannelsCurrentPage - 1)">Previous</a>
-                                    </li>
-
-                                    <li v-for="page in providerChannelsPaginationPages" :key="page" class="page-item" :class="{ active: providerChannelsCurrentPage === page }">
-                                        <a class="page-link" href="#" @click.prevent="loadProviderChannelsPage(page)">[[ page ]]</a>
+                                    <li class="page-item" :class="{ disabled: providerStreamsCurrentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="loadProviderStreamsPage(providerStreamsCurrentPage - 1)">Previous</a>
                                     </li>
 
-                                    <li class="page-item" :class="{ disabled: providerChannelsCurrentPage === providerChannelsTotalPages }">
-                                        <a class="page-link" href="#" @click.prevent="loadProviderChannelsPage(providerChannelsCurrentPage + 1)">Next</a>
+                                    <li v-for="page in providerStreamsPaginationPages" :key="page" class="page-item" :class="{ active: providerStreamsCurrentPage === page }">
+                                        <a class="page-link" href="#" @click.prevent="loadProviderStreamsPage(page)">[[ page ]]</a>
                                     </li>
-                                    <li class="page-item" :class="{ disabled: providerChannelsCurrentPage === providerChannelsTotalPages }">
-                                        <a class="page-link" href="#" @click.prevent="loadProviderChannelsPage(providerChannelsTotalPages)">Last</a>
+
+                                    <li class="page-item" :class="{ disabled: providerStreamsCurrentPage === providerStreamsTotalPages }">
+                                        <a class="page-link" href="#" @click.prevent="loadProviderStreamsPage(providerStreamsCurrentPage + 1)">Next</a>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: providerStreamsCurrentPage === providerStreamsTotalPages }">
+                                        <a class="page-link" href="#" @click.prevent="loadProviderStreamsPage(providerStreamsTotalPages)">Last</a>
                                     </li>
                                 </ul>
                             </nav>
@@ -386,7 +386,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure you want to delete the channel "[[ selectedChannel.title || (selectedChannel.provider_channel ? selectedChannel.provider_channel.title : '') ]]"?</p>
+                    <p>Are you sure you want to delete the channel "[[ selectedChannel.title || (selectedChannel.provider_stream ? selectedChannel.provider_stream.title : '') ]]"?</p>
                     <p class="text-danger">This action cannot be undone.</p>
                 </div>
                 <div class="modal-footer">
@@ -423,7 +423,7 @@
             popover: null,
             // Add/Edit Channel Modal
             editChannelModal: null,
-            providerChannelsModal: null,
+            providerStreamsModal: null,
             newCategoryModal: null,
             selectedChannel: {
                 id: null,
@@ -431,7 +431,7 @@
                 tvg_id: '',
                 logo_url: '',
                 category: '',
-                provider_channel: null
+                provider_stream: null
             },
             selectedChannelProviderId: null,
             formError: null,
@@ -443,12 +443,12 @@
             categoryError: null,
             categorySubmitting: false,
             // Provider Channels Modal
-            providerChannels: [],
-            providerChannelsLoading: false,
-            providerChannelsError: null,
-            providerChannelsCurrentPage: 1,
-            providerChannelsTotalPages: 1,
-            providerChannelsPageSize: 10,
+            providerStreams: [],
+            providerStreamsLoading: false,
+            providerStreamsError: null,
+            providerStreamsCurrentPage: 1,
+            providerStreamsTotalPages: 1,
+            providerStreamsPageSize: 10,
             // Delete Channel
             deleteModal: null,
         },
@@ -460,7 +460,7 @@
 
             // Initialize modals
             this.editChannelModal = new bootstrap.Modal(document.getElementById('editChannelModal'));
-            this.providerChannelsModal = new bootstrap.Modal(document.getElementById('providerChannelsModal'));
+            this.providerStreamsModal = new bootstrap.Modal(document.getElementById('providerStreamsModal'));
             this.newCategoryModal = new bootstrap.Modal(document.getElementById('newCategoryModal'));
             this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
 
@@ -492,11 +492,11 @@
                     return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
                 }
             },
-            providerChannelsPaginationPages() {
+            providerStreamsPaginationPages() {
                 // Generate an array of page numbers to display in pagination
                 // Show at most 5 pages, centered around the current page
-                const totalPages = this.providerChannelsTotalPages;
-                const currentPage = this.providerChannelsCurrentPage;
+                const totalPages = this.providerStreamsTotalPages;
+                const currentPage = this.providerStreamsCurrentPage;
 
                 if (totalPages <= 5) {
                     // If there are 5 or fewer pages, show all of them
@@ -516,7 +516,7 @@
             },
             isFormValid() {
                 // Check if the form is valid
-                return this.selectedChannel.provider_channel != null;
+                return this.selectedChannel.provider_stream != null;
             }
         },
         methods: {
@@ -629,7 +629,7 @@
                 // Use Bootstrap's popover
                 this.$nextTick(() => {
                     const popoverTrigger = event.currentTarget;
-                    const popoverContent = document.getElementById('channelDetailsTemplate').innerHTML;
+                    const popoverContent = document.getElementById('streamDetailsTemplate').innerHTML;
 
                     this.popover = new bootstrap.Popover(popoverTrigger, {
                         html: true,
@@ -730,7 +730,7 @@
                     tvg_id: '',
                     logo_url: '',
                     category: '',
-                    provider_channel: null
+                    provider_stream: null
                 };
                 this.selectedChannelProviderId = null;
                 this.formError = null;
@@ -745,7 +745,7 @@
             showEditChannelModal(channel) {
                 // Set to edit mode and populate form with channel data
                 this.selectedChannel = channel;
-                this.selectedChannelProviderId = channel.provider_channel.provider.id;
+                this.selectedChannelProviderId = channel.provider_stream.provider.id;
                 this.formError = null;
                 this.formSubmitting = false;
 
@@ -757,59 +757,59 @@
 
             onProviderChange() {
                 // Reset provider channel when provider changes
-                this.selectedChannel.provider_channel = null;
+                this.selectedChannel.provider_stream = null;
             },
 
-            showProviderChannelsModal() {
+            showProviderStreamsModal() {
                 if (!this.selectedChannelProviderId) {
                     return;
                 }
 
                 // Reset provider channels data
-                this.providerChannels = [];
-                this.providerChannelsCurrentPage = 1;
-                this.providerChannelsTotalPages = 1;
-                this.providerChannelsError = null;
+                this.providerStreams = [];
+                this.providerStreamsCurrentPage = 1;
+                this.providerStreamsTotalPages = 1;
+                this.providerStreamsError = null;
 
                 // Show modal
-                this.providerChannelsModal.show();
+                this.providerStreamsModal.show();
 
                 // Load first page of provider channels
-                this.loadProviderChannelsPage(1);
+                this.loadProviderStreamsPage(1);
             },
 
-            loadProviderChannelsPage(page) {
-                this.providerChannelsLoading = true;
-                this.providerChannelsError = null;
+            loadProviderStreamsPage(page) {
+                this.providerStreamsLoading = true;
+                this.providerStreamsError = null;
 
                 // Fetch provider channels for the specified page
-                axios.get(`/api/providers/${this.selectedChannelProviderId}/channels/`, {
+                axios.get(`/api/providers/${this.selectedChannelProviderId}/streams/`, {
                     params: {
                         page: page,
-                        size: this.providerChannelsPageSize
+                        size: this.providerStreamsPageSize
                     }
                 })
                 .then(response => {
                     // Update provider channels data
-                    this.providerChannels = response.data.items;
-                    this.providerChannelsCurrentPage = response.data.page;
-                    this.providerChannelsTotalPages = Math.ceil(response.data.total / this.providerChannelsPageSize);
-                    this.providerChannelsLoading = false;
+                    this.providerStreams = response.data.items;
+                    this.providerStreamsCurrentPage = response.data.page;
+                    this.providerStreamsTotalPages = Math.ceil(response.data.total / this.providerStreamsPageSize);
+                    this.providerStreamsLoading = false;
                 })
                 .catch(error => {
-                    console.error('Error fetching provider channels:', error);
-                    this.providerChannelsError = 'Failed to load provider channels. Please try again.';
-                    this.providerChannelsLoading = false;
+                    console.error('Error fetching provider streams:', error);
+                    this.providerStreamsError = 'Failed to load provider streams. Please try again.';
+                    this.providerStreamsLoading = false;
                 });
             },
 
-            selectProviderChannel(channel) {
-                // Set selected provider channel
-                this.selectedChannel.provider_channel = channel;
-                this.selectedChannel.provider_channel.provider = this.providers.find((p) => p.id == this.selectedChannelProviderId)
+            selectProviderStream(channel) {
+                // Set selected provider stream
+                this.selectedChannel.provider_stream = channel;
+                this.selectedChannel.provider_stream.provider = this.providers.find((p) => p.id == this.selectedChannelProviderId)
 
                 // Close provider channels modal
-                this.providerChannelsModal.hide();
+                this.providerStreamsModal.hide();
             },
 
             saveChannel() {
@@ -824,7 +824,7 @@
 
                 // Prepare payload
                 const payload = {
-                    provider_channel_id: this.selectedChannel.provider_channel.id
+                    provider_stream_id: this.selectedChannel.provider_stream.id
                 };
 
                 // Add optional fields if they have values
@@ -855,7 +855,7 @@
                             this.loadPage(this.currentPage);
 
                             // Refresh categories, if needed
-                            if (this.selectedChannel.category && !this.categories.include(this.selectedChannel.category)) {
+                            if (this.selectedChannel.category && !this.categories.includes(this.selectedChannel.category)) {
                                 this.fetchCategories();
                             }
 
@@ -880,7 +880,7 @@
                             this.loadPage(this.currentPage);
 
                             // Refresh categories, if needed
-                            if (this.selectedChannel.category && !this.categories.include(this.selectedChannel.category)) {
+                            if (this.selectedChannel.category && !this.categories.includes(this.selectedChannel.category)) {
                                 this.fetchCategories();
                             }
 

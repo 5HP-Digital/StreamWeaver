@@ -8,6 +8,6 @@ public class Provider : ITimestampable
     public bool IsEnabled { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    public virtual ICollection<ProviderChannel> Channels { get; init; } = [];
+    public virtual ICollection<ProviderStream> Streams { get; init; } = [];
     public virtual ICollection<ProviderSyncJob> Jobs { get; init; } = [];
 }

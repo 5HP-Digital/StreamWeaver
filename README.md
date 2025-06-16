@@ -176,8 +176,8 @@ The following API endpoints are available:
 
 - `/api/server-time/` - Get current server time
 - `/api/resource-utilization/` - Get CPU and memory usage
-- `/api/sources/` - Access playlist sources
-- `/api/sources/<id>/channels/` - Access channels for a specific source
+- `/api/providers/` - Access IPTV providers
+- `/api/providers/<id>/streams/` - Access streams for a specific provider
 
 ## WebSocket Endpoints
 

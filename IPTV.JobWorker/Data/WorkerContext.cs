@@ -57,7 +57,7 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
 
             builder.Property(e => e.MaxAttempts);
             
-            builder.Property(e => e.AllowChannelAutoDeletion)
+            builder.Property(e => e.AllowStreamAutoDeletion)
                 .IsRequired()
                 .HasDefaultValue(true);
 
@@ -106,7 +106,7 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
                 .IsRequired();
 
             // Relationships
-            builder.HasMany(e => e.Channels)
+            builder.HasMany(e => e.Streams)
                 .WithOne()
                 .HasForeignKey("provider_id")
                 .OnDelete(DeleteBehavior.Cascade);
@@ -116,11 +116,11 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // ProviderChannel
-        modelBuilder.Entity<ProviderChannel>(builder =>
+        // ProviderStream
+        modelBuilder.Entity<ProviderStream>(builder =>
         {
             // Table
-            builder.ToTable("provider_manager_providerchannel");
+            builder.ToTable("provider_manager_providerstream");
             builder.HasKey(e => e.Id);
 
             // Properties
