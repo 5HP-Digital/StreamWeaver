@@ -12,9 +12,6 @@
         display: flex;
         gap: 5px;
     }
-    .modal-backdrop {
-        opacity: 0.5;
-    }
     .stream-count-link {
         color: #0d6efd;
         cursor: pointer;
@@ -194,7 +191,7 @@
         </div>
         <div v-for="provider in providers" :key="provider.id" class="col-md-4 mb-4">
             <div class="card provider-card">
-                <div class="card-body">
+                <div class="card-header">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <h5 class="card-title mb-0">[[ provider.name ]]</h5>
                         <div class="form-check form-switch">
@@ -205,8 +202,10 @@
                             </label>
                         </div>
                     </div>
-                    <p class="card-text">
-                        <strong>URL:</strong> <a :href="provider.url" target="_blank" class="url-ellipsis">[[ provider.url ]]</a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text d-inline-block text-truncate w-100">
+                        <strong>URL:</strong> <a :href="provider.url" target="_blank">[[ provider.url ]]</a>
                     </p>
                     <p class="card-text">
                         <strong>Streams:</strong>
@@ -345,7 +344,7 @@
                                 <tbody>
                                     <tr v-for="stream in streams" :key="stream.id" :class="{'inactive-stream': !stream.is_active}">
                                         <td>
-                                            <img v-if="stream.logo_url" :src="stream.logo_url" class="stream-logo" @error="handleLogoError">
+                                            <img v-if="stream.logo_url" :src="stream.logo_url" class="stream-logo" alt="Stream logo" @error="handleLogoError">
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">

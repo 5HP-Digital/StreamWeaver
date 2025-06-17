@@ -48,9 +48,6 @@
     .sortable-header:hover {
         text-decoration: underline;
     }
-    .filter-popover {
-        max-width: 300px;
-    }
     .bi-funnel, .bi-funnel-fill {
         cursor: pointer;
     }
@@ -126,7 +123,7 @@
                             <td>
                                 <img v-if="channel.logo_url || (channel.provider_stream && channel.provider_stream.logo_url)" 
                                      :src="channel.logo_url || (channel.provider_stream ? channel.provider_stream.logo_url : '')" 
-                                     class="channel-logo" 
+                                     class="channel-logo" alt="Channel logo"
                                      @error="handleLogoError">
                             </td>
                             <td>[[ channel.title || channel.provider_stream.title ]]</td>
@@ -181,7 +178,7 @@
             <div v-if="selectedChannel && selectedChannel.provider_stream">
                 <img v-if="selectedChannel.provider_stream.logo_url" 
                      :src="selectedChannel.provider_stream.logo_url" 
-                     class="stream-info-thumbnail" 
+                     class="stream-info-thumbnail" alt="Stream logo"
                      @error="handleLogoError">
                 <p><strong>Title:</strong> [[ selectedChannel.provider_stream.title ]]</p>
                 <p><strong>TVG ID:</strong> [[ selectedChannel.provider_stream.tvg_id ]]</p>
@@ -382,7 +379,7 @@
                         <tbody>
                             <tr v-for="stream in availableStreams" :key="stream.id" :class="{'inactive-channel': !stream.is_active}">
                                 <td>
-                                    <img v-if="stream.logo_url" :src="stream.logo_url" class="channel-logo" @error="handleLogoError">
+                                    <img v-if="stream.logo_url" :src="stream.logo_url" class="channel-logo" alt="Channel logo" @error="handleLogoError">
                                 </td>
                                 <td>
                                     <span :title="stream.tvg_id">[[ stream.title ]]</span>
@@ -589,28 +586,6 @@
                     return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
                 }
             },
-            providerStreamsPaginationPages() {
-                // Generate an array of page numbers to display in pagination
-                // Show at most 5 pages, centered around the current page
-                const totalPages = this.providerStreamsTotalPages;
-                const currentPage = this.providerStreamsCurrentPage;
-
-                if (totalPages <= 5) {
-                    // If there are 5 or fewer pages, show all of them
-                    return Array.from({ length: totalPages }, (_, i) => i + 1);
-                } else {
-                    // Otherwise, show 5 pages centered around the current page
-                    let startPage = Math.max(currentPage - 2, 1);
-                    let endPage = startPage + 4;
-
-                    if (endPage > totalPages) {
-                        endPage = totalPages;
-                        startPage = Math.max(endPage - 4, 1);
-                    }
-
-                    return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
-                }
-            },
             isFormValid() {
                 // Check if the form is valid
                 if (!this.selectedChannel.provider_stream) {
@@ -623,11 +598,7 @@
                 }
 
                 // Check if logo URL is valid
-                if (!this.useStreamLogo && (!this.selectedChannel.logo_url || !this.selectedChannel.logo_url.trim())) {
-                    return false;
-                }
-
-                return true;
+                return !(!this.useStreamLogo && (!this.selectedChannel.logo_url || !this.selectedChannel.logo_url.trim()));
             },
             availableStreamsPaginationPages() {
                 // Generate an array of page numbers to display in pagination
@@ -1002,12 +973,11 @@
             },
 
             cancelAddEdit() {
-                if (this.selectedChannel.id) {
-                    // If editing, just close the modal
-                    this.editChannelModal.hide();
-                } else {
-                    // If adding, close the modal and go back to the offcanvas
-                    this.editChannelModal.hide();
+                // Close the edit modal
+                this.editChannelModal.hide();
+
+                if (!this.selectedChannel.id) {
+                    // If adding, go back to the offcanvas
                     this.streamsOffcanvas.show();
                 }
             },
@@ -1064,7 +1034,7 @@
                 if (this.selectedChannel.id) {
                     // Send request to update channel
                     axios.patch(`/api/channels/${this.selectedChannel.id}/`, payload)
-                        .then(response => {
+                        .then(_ => {
                             // Close modal
                             this.editChannelModal.hide();
 
@@ -1090,7 +1060,7 @@
 
                     // Send request to add channel
                     axios.post(`/api/playlists/${this.playlistId}/channels/`, payload)
-                        .then(response => {
+                        .then(_ => {
                             // Close modal and offcanvas
                             this.editChannelModal.hide();
                             this.streamsOffcanvas.hide();

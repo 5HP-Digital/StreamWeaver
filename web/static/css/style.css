@@ -7,13 +7,3 @@
 .card:hover {
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
 }
-
-/* Additional styles can be added here */
-.url-ellipsis {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: inline-block;
-    max-width: calc(100% - 40px);
-    vertical-align: bottom;
-}

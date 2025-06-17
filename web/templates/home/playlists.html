@@ -12,9 +12,6 @@
         display: flex;
         gap: 5px;
     }
-    .modal-backdrop {
-        opacity: 0.5;
-    }
     .channel-count-link {
         color: #0d6efd;
         cursor: pointer;
@@ -67,10 +64,12 @@
         </div>
         <div v-for="playlist in playlists" :key="playlist.id" class="col-md-4 mb-4">
             <div class="card playlist-card">
-                <div class="card-body">
+                <div class="card-header">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <h5 class="card-title mb-0">[[ playlist.name ]]</h5>
                     </div>
+                </div>
+                <div class="card-body">
                     <p class="card-text">
                         <strong>Channels:</strong> 
                         <span v-if="playlist.channel_count > 0"
@@ -204,7 +203,7 @@
                                         <td>
                                             <img v-if="channel.logo_url || channel.provider_stream.logo_url" 
                                                  :src="channel.logo_url || channel.provider_stream.logo_url" 
-                                                 class="channel-logo" 
+                                                 class="channel-logo" alt="Channel logo"
                                                  @error="handleLogoError">
                                         </td>
                                         <td>
