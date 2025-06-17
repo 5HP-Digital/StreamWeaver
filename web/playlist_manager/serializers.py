@@ -115,7 +115,7 @@ class PlaylistChannelCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating a PlaylistChannel.
     """
-    title = serializers.CharField(required=False)
+    title = serializers.CharField(required=False, allow_null=True)
     provider_stream_id = serializers.IntegerField(required=True)
 
     class Meta:
@@ -123,7 +123,7 @@ class PlaylistChannelCreateSerializer(serializers.ModelSerializer):
         fields = ['title', 'tvg_id', 'category', 'logo_url', 'provider_stream_id']
 
     def validate_title(self, value):
-        if not value.strip():
+        if value and not value.strip():
             raise serializers.ValidationError("Title cannot be empty.")
         return value
 
@@ -144,7 +144,7 @@ class PlaylistChannelUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for updating a PlaylistChannel.
     """
-    title = serializers.CharField(required=False)
+    title = serializers.CharField(required=False, allow_null=True)
     provider_stream_id = serializers.IntegerField(required=False)
     order = serializers.IntegerField(required=False)
 
@@ -153,7 +153,7 @@ class PlaylistChannelUpdateSerializer(serializers.ModelSerializer):
         fields = ['title', 'tvg_id', 'category', 'logo_url', 'provider_stream_id', 'order']
 
     def validate_title(self, value):
-        if not value.strip():
+        if value and not value.strip():
             raise serializers.ValidationError("Title cannot be empty.")
         return value
 

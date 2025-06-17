@@ -41,6 +41,19 @@
         max-height: 60px;
         margin-bottom: 10px;
     }
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+    }
+    .sortable-header:hover {
+        text-decoration: underline;
+    }
+    .filter-popover {
+        max-width: 300px;
+    }
+    .bi-funnel, .bi-funnel-fill {
+        cursor: pointer;
+    }
 </style>
 {% endblock %}
 
@@ -53,7 +66,7 @@
             </a>
             <h1 class="h2 d-inline-block">Channel Editor: [[ playlistName ]]</h1>
         </div>
-        <button class="btn btn-primary" @click="showAddChannelModal">
+        <button class="btn btn-primary" @click="showStreamsOffcanvas">
             <i class="bi bi-plus"></i> Add New Channel
         </button>
     </div>
@@ -119,7 +132,7 @@
                             <td>[[ channel.title || channel.provider_stream.title ]]</td>
                             <td>[[ channel.tvg_id || channel.provider_stream.tvg_id ]]</td>
                             <td>[[ channel.category ]]</td>
-                            <td @click="showChannelDetails(channel, $event)" style="cursor: pointer;">
+                            <td @click="showStreamDetails(channel, $event)" style="cursor: pointer;">
                                 <span>[[ channel.provider_stream.title ]]</span>
                             </td>
                             <td>
@@ -184,7 +197,7 @@
         </div>
     </div>
 
-    <!-- Add Channel Modal -->
+    <!-- Add/Edit Channel Modal -->
     <div class="modal fade" id="editChannelModal" tabindex="-1" aria-labelledby="addChannelModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -198,19 +211,44 @@
                     </div>
                     <form @submit.prevent="saveChannel">
                         <div class="mb-3">
-                            <label for="channelTitle" class="form-label">Title</label>
-                            <input type="text" class="form-control" id="channelTitle" v-model="selectedChannel.title">
-                            <div class="form-text">Optional</div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label for="channelTitle" class="form-label mb-0">Title</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="useStreamTitle" v-model="useStreamTitle">
+                                    <label class="form-check-label" for="useStreamTitle">
+                                        Use stream
+                                    </label>
+                                </div>
+                            </div>
+                            <input v-if="!useStreamTitle"
+                                   type="text" class="form-control" id="channelTitle"
+                                   v-model="selectedChannel.title"
+                                   required="required">
+                            <input v-else
+                                   type="text" class="form-control"
+                                   :value="selectedChannel.provider_stream ? selectedChannel.provider_stream.title : ''"
+                                   disabled="disabled">
+                            <div class="form-text">Required</div>
                         </div>
                         <div class="mb-3">
-                            <label for="channelTvgId" class="form-label">TVG ID</label>
-                            <input type="text" class="form-control" id="channelTvgId" v-model="selectedChannel.tvg_id">
-                            <div class="form-text">Optional</div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="channelLogo" class="form-label">Logo URL</label>
-                            <input type="url" class="form-control" id="channelLogo" v-model="selectedChannel.logo_url">
-                            <div class="form-text">Optional, must be a valid URL</div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label for="channelLogo" class="form-label mb-0">Logo URL</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="useStreamLogo" v-model="useStreamLogo">
+                                    <label class="form-check-label" for="useStreamLogo">
+                                        Use stream
+                                    </label>
+                                </div>
+                            </div>
+                            <input v-if="!useStreamLogo"
+                                   type="url" class="form-control" id="channelLogo"
+                                   v-model="selectedChannel.logo_url"
+                                   required>
+                            <input v-else
+                                   type="url" class="form-control"
+                                   :value="selectedChannel.provider_stream ? selectedChannel.provider_stream.logo_url : ''"
+                                   disabled>
+                            <div class="form-text">Required, must be a valid URL</div>
                         </div>
                         <div class="mb-3">
                             <label for="channelCategory" class="form-label">Category</label>
@@ -219,32 +257,12 @@
                                     <option value="">Select a category...</option>
                                     <option v-for="category in selectedChannelCategories" :value="category">[[ category ]]</option>
                                 </select>
-                                <button class="btn btn-outline-secondary" type="button" @click="showNewCategoryModal">New...</button>
+                                <button class="btn btn-outline-secondary" type="button" @click="showNewCategoryModal">Add...</button>
                             </div>
                             <div class="form-text">Optional</div>
                         </div>
-                        <div class="mb-3">
-                            <label for="channelProvider" class="form-label">Provider</label>
-                            <select class="form-select" id="channelProvider" v-model="selectedChannelProviderId" @change="onProviderChange" required>
-                                <option value="">Select a provider...</option>
-                                <option v-for="provider in providers" :key="provider.id" :value="provider.id">[[ provider.name ]]</option>
-                            </select>
-                            <div class="form-text">Required</div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="channelProviderStream" class="form-label">Stream</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="channelProviderStream" 
-                                       :value="selectedChannel.provider_stream ? selectedChannel.provider_stream.title : ''"
-                                       disabled required>
-                                <button class="btn btn-outline-secondary" type="button" 
-                                        @click="showProviderStreamsModal" 
-                                        :disabled="!selectedChannelProviderId">Select...</button>
-                            </div>
-                            <div class="form-text">Required</div>
-                        </div>
                         <div class="d-flex justify-content-end">
-                            <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-secondary me-2" @click="cancelAddEdit">Cancel</button>
                             <button type="submit" class="btn btn-primary" :disabled="formSubmitting || !isFormValid">
                                 <span v-if="formSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                                 Save
@@ -256,98 +274,6 @@
         </div>
     </div>
 
-    <!-- Provider Streams Modal -->
-    <div class="modal fade" id="providerStreamsModal" tabindex="-1" aria-labelledby="providerStreamsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="providerStreamsModalLabel">Select Stream</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div v-if="providerStreamsLoading" class="text-center p-4">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mt-3">Loading streams...</p>
-                    </div>
-
-                    <div v-else-if="providerStreamsError" class="alert alert-danger">
-                        [[ providerStreamsError ]]
-                    </div>
-
-                    <div v-else-if="providerStreams.length === 0" class="alert alert-info">
-                        No streams found for this provider.
-                    </div>
-
-                    <div v-else>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th></th>
-                                        <th>Name</th>
-                                        <th>TVG-ID</th>
-                                        <th>Group</th>
-                                        <th>Updated</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="stream in providerStreams" :key="stream.id" :class="{'inactive-channel': !stream.is_active}">
-                                        <td>
-                                            <img v-if="stream.logo_url" :src="stream.logo_url" class="channel-logo" @error="handleLogoError">
-                                        </td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                [[ stream.title ]]
-                                            </div>
-                                        </td>
-                                        <td>[[ stream.tvg_id ]]</td>
-                                        <td>[[ stream.group ]]</td>
-                                        <td>[[ formatDate(stream.updated_at) ]]</td>
-                                        <td>
-                                            <button class="btn btn-sm btn-primary" @click="selectProviderStream(stream)">
-                                                Select
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Pagination -->
-                        <div class="pagination-container" v-if="providerStreamsTotalPages > 1">
-                            <nav aria-label="Provider stream list pagination">
-                                <ul class="pagination">
-                                    <li class="page-item" :class="{ disabled: providerStreamsCurrentPage === 1 }">
-                                        <a class="page-link" href="#" @click.prevent="loadProviderStreamsPage(1)">First</a>
-                                    </li>
-                                    <li class="page-item" :class="{ disabled: providerStreamsCurrentPage === 1 }">
-                                        <a class="page-link" href="#" @click.prevent="loadProviderStreamsPage(providerStreamsCurrentPage - 1)">Previous</a>
-                                    </li>
-
-                                    <li v-for="page in providerStreamsPaginationPages" :key="page" class="page-item" :class="{ active: providerStreamsCurrentPage === page }">
-                                        <a class="page-link" href="#" @click.prevent="loadProviderStreamsPage(page)">[[ page ]]</a>
-                                    </li>
-
-                                    <li class="page-item" :class="{ disabled: providerStreamsCurrentPage === providerStreamsTotalPages }">
-                                        <a class="page-link" href="#" @click.prevent="loadProviderStreamsPage(providerStreamsCurrentPage + 1)">Next</a>
-                                    </li>
-                                    <li class="page-item" :class="{ disabled: providerStreamsCurrentPage === providerStreamsTotalPages }">
-                                        <a class="page-link" href="#" @click.prevent="loadProviderStreamsPage(providerStreamsTotalPages)">Last</a>
-                                    </li>
-                                </ul>
-                            </nav>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- New Category Modal -->
     <div class="modal fade" id="newCategoryModal" tabindex="-1" aria-labelledby="newCategoryModalLabel" aria-hidden="true">
@@ -399,6 +325,160 @@
             </div>
         </div>
     </div>
+
+    <!-- Streams Selection Offcanvas -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="streamsOffcanvas" aria-labelledby="streamsOffcanvasLabel" style="width: 800px;">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="streamsOffcanvasLabel">Select Stream</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <div v-if="availableStreamsLoading" class="text-center p-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3">Loading streams...</p>
+            </div>
+
+            <div v-else-if="availableStreamsError" class="alert alert-danger">
+                [[ availableStreamsError ]]
+            </div>
+
+            <div v-else-if="availableStreams.length === 0" class="alert alert-info">
+                No streams available for this playlist.
+                <button v-if="availableStreamsFilters.q || availableStreamsFilters.provider_id || availableStreamsFilters.is_active"
+                        type="button" class="btn btn-sm btn-outline-secondary float-end"
+                        @click="clearStreamFilterAll">
+                    Clear Filters
+                </button>
+            </div>
+
+            <div v-else>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Logo</th>
+                                <th>
+                                    <span class="sortable-header" @click="sortAvailableStreams('title')">Title</span>
+                                    <i v-if="availableStreamsSortFields.title.active"
+                                       :class="'bi bi-sort-' + (availableStreamsSortFields.title.direction === 'asc' ? 'down' : 'up')"></i>
+                                    <i :class='"bi bi-funnel" + (availableStreamsFilters.q ? "-fill" : "") + " ms-1" + (availableStreamsFilters.q ? " text-primary" : "" )'
+                                       @click.stop="showStreamFilter($event, 'q')"></i>
+                                </th>
+                                <th>
+                                    <span class="sortable-header" @click="sortAvailableStreams('group')">Group</span>
+                                    <i v-if="availableStreamsSortFields.group.active"
+                                       :class="'bi bi-sort-' + (availableStreamsSortFields.group.direction === 'asc' ? 'down' : 'up')"></i>
+                                </th>
+                                <th>
+                                    Provider
+                                    <i :class='"bi bi-funnel" + (availableStreamsFilters.provider_id ? "-fill" : "") + " ms-1" + (availableStreamsFilters.provider_id ? " text-primary" : "")'
+                                       @click.stop="showStreamFilter($event, 'provider')"></i>
+                                </th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="stream in availableStreams" :key="stream.id" :class="{'inactive-channel': !stream.is_active}">
+                                <td>
+                                    <img v-if="stream.logo_url" :src="stream.logo_url" class="channel-logo" @error="handleLogoError">
+                                </td>
+                                <td>
+                                    <span :title="stream.tvg_id">[[ stream.title ]]</span>
+                                </td>
+                                <td>[[ stream.group ]]</td>
+                                <td>
+                                    [[ stream.provider.name ]]
+                                    <i v-if="stream.provider && !stream.provider.is_enabled" 
+                                       class="bi bi-exclamation-triangle-fill warning-icon" 
+                                       title="Provider is disabled"></i>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" @click="showAddChannelModal(stream)">
+                                        Add
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination-container" v-if="availableStreamsTotalPages > 1">
+                    <nav aria-label="Available streams pagination">
+                        <ul class="pagination">
+                            <li class="page-item" :class="{ disabled: availableStreamsCurrentPage === 1 }">
+                                <a class="page-link" href="#" @click.prevent="loadAvailableStreamsPage(1)">First</a>
+                            </li>
+                            <li class="page-item" :class="{ disabled: availableStreamsCurrentPage === 1 }">
+                                <a class="page-link" href="#" @click.prevent="loadAvailableStreamsPage(availableStreamsCurrentPage - 1)">Previous</a>
+                            </li>
+
+                            <li v-for="page in availableStreamsPaginationPages" :key="page" class="page-item" :class="{ active: availableStreamsCurrentPage === page }">
+                                <a class="page-link" href="#" @click.prevent="loadAvailableStreamsPage(page)">[[ page ]]</a>
+                            </li>
+
+                            <li class="page-item" :class="{ disabled: availableStreamsCurrentPage === availableStreamsTotalPages }">
+                                <a class="page-link" href="#" @click.prevent="loadAvailableStreamsPage(availableStreamsCurrentPage + 1)">Next</a>
+                            </li>
+                            <li class="page-item" :class="{ disabled: availableStreamsCurrentPage === availableStreamsTotalPages }">
+                                <a class="page-link" href="#" @click.prevent="loadAvailableStreamsPage(availableStreamsTotalPages)">Last</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+
+                <div class="mt-3">
+                    <small class="text-muted">Note: Grayed-out rows indicate inactive streams.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Title filter modal -->
+    <div class="modal fade" id="filterTitleModal" tabindex="-1" aria-labelledby="filterTitleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="filterTitleModalLabel">Filter by Title</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="titleFilter" placeholder="Search text..." v-model="availableStreamsFilters.q"/>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" @click="clearStreamFilter('q')">Clear</button>
+                    <button type="button" class="btn btn-sm btn-primary" @click="applyStreamFilter('q', availableStreamsFilters.q)" :disabled="!availableStreamsFilters.q">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Provider filter modal -->
+    <div class="modal fade" id="filterProviderModal" tabindex="-1" aria-labelledby="filterProviderModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="filterProviderModalLabel">Filter by Provider</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <select class="form-select" id="providerFilter" v-model="availableStreamsFilters.provider_id">
+                            <option v-for="provider in providers" :value="provider.id">[[ provider.name ]]</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" @click="clearStreamFilter('provider_id')">Clear</button>
+                    <button type="button" class="btn btn-sm btn-primary" @click="applyStreamFilter('provider_id', availableStreamsFilters.provider_id)" :disabled="!availableStreamsFilters.provider_id">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -423,7 +503,6 @@
             popover: null,
             // Add/Edit Channel Modal
             editChannelModal: null,
-            providerStreamsModal: null,
             newCategoryModal: null,
             selectedChannel: {
                 id: null,
@@ -433,7 +512,8 @@
                 category: '',
                 provider_stream: null
             },
-            selectedChannelProviderId: null,
+            useStreamTitle: true,
+            useStreamLogo: true,
             formError: null,
             formSubmitting: false,
             providers: [],
@@ -442,15 +522,30 @@
             newCategoryName: '',
             categoryError: null,
             categorySubmitting: false,
-            // Provider Channels Modal
-            providerStreams: [],
-            providerStreamsLoading: false,
-            providerStreamsError: null,
-            providerStreamsCurrentPage: 1,
-            providerStreamsTotalPages: 1,
-            providerStreamsPageSize: 10,
+            // Streams Offcanvas
+            streamsOffcanvas: null,
+            availableStreams: [],
+            availableStreamsLoading: false,
+            availableStreamsError: null,
+            availableStreamsCurrentPage: 1,
+            availableStreamsTotalPages: 1,
+            availableStreamsPageSize: 10,
+            // Sorting and filtering
+            availableStreamsSortBy: 'group,title',
+            availableStreamsSortFields: {
+                title: { active: false, direction: 'asc' },
+                group: { active: true, direction: 'asc' }
+            },
+            availableStreamsFilters: {
+                q: '',
+                provider_id: '',
+                is_active: ''
+            },
             // Delete Channel
             deleteModal: null,
+            // Filter Modals
+            filterTitleModal: null,
+            filterProviderModal: null,
         },
         mounted() {
             this.fetchPlaylist();
@@ -458,11 +553,13 @@
             this.fetchProviders();
             this.fetchCategories()
 
-            // Initialize modals
+            // Initialize modals and offcanvas
             this.editChannelModal = new bootstrap.Modal(document.getElementById('editChannelModal'));
-            this.providerStreamsModal = new bootstrap.Modal(document.getElementById('providerStreamsModal'));
+            this.streamsOffcanvas = new bootstrap.Offcanvas(document.getElementById('streamsOffcanvas'));
             this.newCategoryModal = new bootstrap.Modal(document.getElementById('newCategoryModal'));
             this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            this.filterTitleModal = new bootstrap.Modal(document.getElementById('filterTitleModal'));
+            this.filterProviderModal = new bootstrap.Modal(document.getElementById('filterProviderModal'));
 
             // Initialize Sortable.js after the DOM is updated
             this.$nextTick(() => {
@@ -516,7 +613,43 @@
             },
             isFormValid() {
                 // Check if the form is valid
-                return this.selectedChannel.provider_stream != null;
+                if (!this.selectedChannel.provider_stream) {
+                    return false;
+                }
+
+                // Check if title is valid
+                if (!this.useStreamTitle && (!this.selectedChannel.title || !this.selectedChannel.title.trim())) {
+                    return false;
+                }
+
+                // Check if logo URL is valid
+                if (!this.useStreamLogo && (!this.selectedChannel.logo_url || !this.selectedChannel.logo_url.trim())) {
+                    return false;
+                }
+
+                return true;
+            },
+            availableStreamsPaginationPages() {
+                // Generate an array of page numbers to display in pagination
+                // Show at most 5 pages, centered around the current page
+                const totalPages = this.availableStreamsTotalPages;
+                const currentPage = this.availableStreamsCurrentPage;
+
+                if (totalPages <= 5) {
+                    // If there are 5 or fewer pages, show all of them
+                    return Array.from({ length: totalPages }, (_, i) => i + 1);
+                } else {
+                    // Otherwise, show 5 pages centered around the current page
+                    let startPage = Math.max(currentPage - 2, 1);
+                    let endPage = startPage + 4;
+
+                    if (endPage > totalPages) {
+                        endPage = totalPages;
+                        startPage = Math.max(endPage - 4, 1);
+                    }
+
+                    return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+                }
             }
         },
         methods: {
@@ -618,10 +751,10 @@
                 const newOrder = Math.min(currentOrder + this.pageSize, this.totalChannels);
                 this.updateChannelOrder(channel.id, newOrder);
             },
-            showChannelDetails(channel, event) {
+            showStreamDetails(channel, event) {
                 // Hide any existing popovers
                 if (this.popover) {
-                    this.closePopover(event)
+                    this.closePopover(event);
                 }
 
                 this.selectedChannel = channel;
@@ -722,7 +855,132 @@
                 this.categorySubmitting = false;
             },
 
-            showAddChannelModal() {
+            showStreamsOffcanvas() {
+                // Reset streams data but keep filtering, sorting, and pagination settings
+                this.availableStreams = [];
+                this.availableStreamsError = null;
+
+                // Show offcanvas
+                this.streamsOffcanvas.show();
+
+                // Load current page of available streams with current filters and sorting
+                this.loadAvailableStreamsPage(this.availableStreamsCurrentPage);
+            },
+
+            loadAvailableStreamsPage(page) {
+                this.availableStreamsLoading = true;
+                this.availableStreamsError = null;
+
+                // Build params object with all filters and sorting
+                const params = {
+                    page: page,
+                    size: this.availableStreamsPageSize,
+                    sort_by: this.availableStreamsSortBy
+                };
+
+                // Add filters if they exist
+                // For title, use the 'q' parameter which searches across title, tvg_id, and group
+                if (this.availableStreamsFilters.q) {
+                    params.q = this.availableStreamsFilters.q;
+                }
+                if (this.availableStreamsFilters.provider_id) {
+                    params.provider_id = this.availableStreamsFilters.provider_id;
+                }
+                if (this.availableStreamsFilters.is_active !== '') {
+                    params.is_active = this.availableStreamsFilters.is_active;
+                }
+
+                // Fetch available streams for the specified page
+                axios.get(`/api/playlists/${this.playlistId}/available_streams/`, { params })
+                .then(response => {
+                    // Update available streams data
+                    this.availableStreams = response.data.items;
+                    this.availableStreamsCurrentPage = response.data.page;
+                    this.availableStreamsTotalPages = Math.ceil(response.data.total / this.availableStreamsPageSize);
+                    this.availableStreamsLoading = false;
+                })
+                .catch(error => {
+                    console.error('Error fetching available streams:', error);
+                    this.availableStreamsError = 'Failed to load available streams. Please try again.';
+                    this.availableStreamsLoading = false;
+                });
+            },
+
+            sortAvailableStreams(field) {
+                // Update sort direction
+                if (this.availableStreamsSortFields[field].active) {
+                    // Toggle direction if already active
+                    this.availableStreamsSortFields[field].direction = 
+                        this.availableStreamsSortFields[field].direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    // Set as active and default to ascending
+                    Object.keys(this.availableStreamsSortFields).forEach(key => {
+                        this.availableStreamsSortFields[key].active = (key === field);
+                    });
+                    this.availableStreamsSortFields[field].direction = 'asc';
+                }
+
+                // Build sort_by parameter
+                if (this.availableStreamsSortFields[field].direction === 'desc') {
+                    this.availableStreamsSortBy = `-${field}`;
+                } else {
+                    this.availableStreamsSortBy = field;
+                }
+
+                // Reload with new sorting
+                this.loadAvailableStreamsPage(1);
+            },
+
+            showStreamFilter(event, filterType) {
+                // Show the appropriate modal based on filter type
+                if (filterType === 'q') {
+                    this.filterTitleModal.show();
+                } else if (filterType === 'provider') {
+                    this.filterProviderModal.show();
+                }
+            },
+
+            applyStreamFilter(filterType, value) {
+                // Apply the filter
+                this.availableStreamsFilters[filterType] = value;
+
+                // Close the appropriate modal
+                if (filterType === 'q') {
+                    this.filterTitleModal.hide();
+                } else if (filterType === 'provider_id') {
+                    this.filterProviderModal.hide();
+                }
+
+                // Reload with new filter
+                this.loadAvailableStreamsPage(1);
+            },
+
+            clearStreamFilter(filterType) {
+                // Clear the filter
+                this.availableStreamsFilters[filterType] = '';
+
+                // Close the appropriate modal
+                if (filterType === 'q') {
+                    this.filterTitleModal.hide();
+                } else if (filterType === 'provider_id') {
+                    this.filterProviderModal.hide();
+                }
+
+                // Reload without this filter
+                this.loadAvailableStreamsPage(1);
+            },
+
+            clearStreamFilterAll() {
+                // Clear the filters
+                this.availableStreamsFilters['q'] = '';
+                this.availableStreamsFilters['is_active'] = '';
+                this.availableStreamsFilters['provider_id'] = '';
+
+                // Reload without this filter
+                this.loadAvailableStreamsPage(1);
+            },
+
+            showAddChannelModal(stream) {
                 // Reset form
                 this.selectedChannel = {
                     id: null,
@@ -730,24 +988,39 @@
                     tvg_id: '',
                     logo_url: '',
                     category: '',
-                    provider_stream: null
+                    provider_stream: stream
                 };
-                this.selectedChannelProviderId = null;
                 this.formError = null;
                 this.formSubmitting = false;
+                this.useStreamTitle = true;
+                this.useStreamLogo = true;
 
                 this.selectedChannelCategories = [...this.categories];
 
                 // Show modal
                 this.editChannelModal.show();
+            },
+
+            cancelAddEdit() {
+                if (this.selectedChannel.id) {
+                    // If editing, just close the modal
+                    this.editChannelModal.hide();
+                } else {
+                    // If adding, close the modal and go back to the offcanvas
+                    this.editChannelModal.hide();
+                    this.streamsOffcanvas.show();
+                }
             },
 
             showEditChannelModal(channel) {
                 // Set to edit mode and populate form with channel data
-                this.selectedChannel = channel;
-                this.selectedChannelProviderId = channel.provider_stream.provider.id;
+                this.selectedChannel = { ...channel };
                 this.formError = null;
                 this.formSubmitting = false;
+
+                // Determine if using stream values or custom values
+                this.useStreamTitle = !channel.title || channel.title === channel.provider_stream.title;
+                this.useStreamLogo = !channel.logo_url || channel.logo_url === channel.provider_stream.logo_url;
 
                 this.selectedChannelCategories = [...this.categories];
 
@@ -755,62 +1028,6 @@
                 this.editChannelModal.show();
             },
 
-            onProviderChange() {
-                // Reset provider channel when provider changes
-                this.selectedChannel.provider_stream = null;
-            },
-
-            showProviderStreamsModal() {
-                if (!this.selectedChannelProviderId) {
-                    return;
-                }
-
-                // Reset provider channels data
-                this.providerStreams = [];
-                this.providerStreamsCurrentPage = 1;
-                this.providerStreamsTotalPages = 1;
-                this.providerStreamsError = null;
-
-                // Show modal
-                this.providerStreamsModal.show();
-
-                // Load first page of provider channels
-                this.loadProviderStreamsPage(1);
-            },
-
-            loadProviderStreamsPage(page) {
-                this.providerStreamsLoading = true;
-                this.providerStreamsError = null;
-
-                // Fetch provider channels for the specified page
-                axios.get(`/api/providers/${this.selectedChannelProviderId}/streams/`, {
-                    params: {
-                        page: page,
-                        size: this.providerStreamsPageSize
-                    }
-                })
-                .then(response => {
-                    // Update provider channels data
-                    this.providerStreams = response.data.items;
-                    this.providerStreamsCurrentPage = response.data.page;
-                    this.providerStreamsTotalPages = Math.ceil(response.data.total / this.providerStreamsPageSize);
-                    this.providerStreamsLoading = false;
-                })
-                .catch(error => {
-                    console.error('Error fetching provider streams:', error);
-                    this.providerStreamsError = 'Failed to load provider streams. Please try again.';
-                    this.providerStreamsLoading = false;
-                });
-            },
-
-            selectProviderStream(channel) {
-                // Set selected provider stream
-                this.selectedChannel.provider_stream = channel;
-                this.selectedChannel.provider_stream.provider = this.providers.find((p) => p.id == this.selectedChannelProviderId)
-
-                // Close provider channels modal
-                this.providerStreamsModal.hide();
-            },
 
             saveChannel() {
                 // Validate form
@@ -823,25 +1040,25 @@
                 this.formError = null;
 
                 // Prepare payload
-                const payload = {
-                    provider_stream_id: this.selectedChannel.provider_stream.id
-                };
+                const payload = {};
 
-                // Add optional fields if they have values
-                if (this.selectedChannel.title) {
+                // Handle title based on useStreamTitle checkbox
+                if (!this.useStreamTitle) {
                     payload.title = this.selectedChannel.title;
+                } else {
+                    payload.title = null;
                 }
 
-                if (this.selectedChannel.tvg_id) {
-                    payload.tvg_id = this.selectedChannel.tvg_id;
-                }
-
+                // Add category if it has a value
                 if (this.selectedChannel.category) {
                     payload.category = this.selectedChannel.category;
                 }
 
-                if (this.selectedChannel.logo_url) {
+                // Handle logo URL based on useStreamLogo checkbox
+                if (!this.useStreamLogo) {
                     payload.logo_url = this.selectedChannel.logo_url;
+                } else {
+                    payload.logo_url = null;
                 }
 
                 if (this.selectedChannel.id) {
@@ -861,20 +1078,22 @@
 
                             // Reset form
                             this.formSubmitting = false;
-                            this.selectedChannelCategories = []
+                            this.selectedChannelCategories = [];
                         })
                         .catch(error => {
                             console.error('Error updating channel:', error);
                             this.formError = 'Failed to update channel. Please check your input and try again.';
                             this.formSubmitting = false;
-                            this.selectedChannelCategories = []
                         });
                 } else {
+                    payload.provider_stream_id = this.selectedChannel.provider_stream.id;
+
                     // Send request to add channel
                     axios.post(`/api/playlists/${this.playlistId}/channels/`, payload)
                         .then(response => {
-                            // Close modal
+                            // Close modal and offcanvas
                             this.editChannelModal.hide();
+                            this.streamsOffcanvas.hide();
 
                             // Refresh channels
                             this.loadPage(this.currentPage);
@@ -886,13 +1105,12 @@
 
                             // Reset form
                             this.formSubmitting = false;
-                            this.selectedChannelCategories = []
+                            this.selectedChannelCategories = [];
                         })
                         .catch(error => {
                             console.error('Error adding channel:', error);
                             this.formError = 'Failed to add channel. Please check your input and try again.';
                             this.formSubmitting = false;
-                            this.selectedChannelCategories = []
                         });
                 }
             },
