@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'home',
     'provider_manager',
     'playlist_manager',
+    'guide_manager',
 ]
 
 MIDDLEWARE = [
