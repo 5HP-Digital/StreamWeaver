@@ -6,11 +6,9 @@ class Country(models.Model):
     """
     Model representing a country.
     """
-    code = models.CharField(max_length=20)
+    code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=255)
     flag = models.CharField(max_length=20, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
@@ -20,10 +18,8 @@ class Category(models.Model):
     """
     Model representing a category.
     """
-    code = models.CharField(max_length=255)
+    code = models.CharField(max_length=255, unique=True)
     name = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
@@ -36,31 +32,14 @@ class Channel(models.Model):
     xmltv_id = models.CharField(max_length=20)
     name = models.CharField(max_length=255)
     network = models.CharField(max_length=255, null=True, blank=True)
-    country = models.ForeignKey(
-        Country,
-        on_delete=models.CASCADE,
-        related_name='channels'
-    )
+    country = models.CharField(max_length=20)
     city = models.CharField(max_length=255, null=True, blank=True)
-    categories = models.ForeignKey(
-        Category,
-        on_delete=models.CASCADE,
-        related_name='channels'
-    )
+    categories = models.CharField(max_length=255, null=True, blank=True)
     is_nsfw = models.BooleanField(default=False)
     launched_at = models.DateField(null=True, blank=True)
     closed_at = models.DateField(null=True, blank=True)
-    replaced_by = models.ForeignKey(
-        'self',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='replaced_channels'
-    )
     website_url = models.TextField(validators=[URLValidator()], null=True, blank=True)
     logo_url = models.TextField(validators=[URLValidator()], null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f'{self.name} ({self.xmltv_id})'
@@ -74,15 +53,7 @@ class Guide(models.Model):
     site_id = models.CharField(max_length=255)
     site_name = models.CharField(max_length=255)
     lang = models.CharField(max_length=20)
-    channel = models.ForeignKey(
-        Channel,
-        on_delete=models.SET_NULL,
-        related_name='guides',
-        null=True,
-        blank=True
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    xmltv_id = models.CharField(max_length=20, null=True, blank=True)
 
     def __str__(self):
         return f"{self.site_name} - {self.site_id}"

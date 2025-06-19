@@ -19,12 +19,21 @@ builder.Services.AddOptions<JobQueueOptions>()
 builder.Services.AddDbContext<WorkerContext>();
 
 // Job runners
+builder.Services.AddScoped<EpgOrgDataSynchronizer>();
 builder.Services.AddScoped<ProviderSynchronizer>();
 
 // Background worker
 builder.Services.AddHostedService<PollingWorker>();
 
 // HttpClient
+builder.Services.AddHttpClient(nameof(EpgOrgDataSynchronizer),
+    client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(30);
+        client.MaxResponseContentBufferSize = 32 * 1024 * 1024;
+        client.DefaultRequestHeaders.Clear();
+    })
+    .SetHandlerLifetime(TimeSpan.FromSeconds(30));
 builder.Services.AddHttpClient(nameof(ProviderSynchronizer),
     client =>
     {

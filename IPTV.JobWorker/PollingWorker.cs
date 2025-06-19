@@ -12,6 +12,8 @@ public class PollingWorker(
     IOptions<JobQueueOptions> options) 
     : BackgroundService
 {
+    private const int AbsoluteMaxAttempts = 100;
+    
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(options.Value.PollingInterval), timeProvider);
     
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -86,6 +88,10 @@ public class PollingWorker(
                     (success, description) = await providerSynchronizer.Run(providerSyncJob.Provider,
                         providerSyncJob.AllowStreamAutoDeletion, cancellationToken: stoppingToken);
                     break;
+                case JobType.EpgDataSync:
+                    var epgOrgDataSynchronizer = scope.ServiceProvider.GetRequiredService<EpgOrgDataSynchronizer>();
+                    (success, description) = await epgOrgDataSynchronizer.Run(cancellationToken: stoppingToken);
+                    break;
                 default:
                     throw new NotSupportedException($"Unsupported job type: {job.Type}");
             }
@@ -108,17 +114,17 @@ public class PollingWorker(
         {
             logger.LogError(ex, "Error processing job");
 
-            if (job.MaxAttempts is null || job.AttemptCount < job.MaxAttempts)
+            if (job.AttemptCount < (job.MaxAttempts ?? AbsoluteMaxAttempts))
             {
                 job.State = JobState.Queued;
                 job.StatusDescription =
-                    $"Error processing job (attempt {job.AttemptCount} of {job.MaxAttempts.ToString() ?? "Unlimited"}). Queued for retry";
+                    $"Error processing job (attempt {job.AttemptCount} of {job.MaxAttempts ?? AbsoluteMaxAttempts}). Queued for retry";
             }
             else
             {
                 job.State = JobState.Failed;
                 job.StatusDescription =
-                    $"Error processing job: {ex.Message}. Job will not be retried.";
+                    $"Error processing job: {ex.Message}. Last attempt reached.";
             }
 
             await workerContext.SaveChangesAsync(cancellationToken: stoppingToken);
