@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('provider_manager', '0002_delete_providersyncjob'),
+        ('provider_manager', '0001_initial'),
     ]
 
     operations = [

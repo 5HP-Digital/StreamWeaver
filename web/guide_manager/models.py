@@ -9,6 +9,8 @@ class Country(models.Model):
     code = models.CharField(max_length=20)
     name = models.CharField(max_length=255)
     flag = models.CharField(max_length=20, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
@@ -20,6 +22,8 @@ class Category(models.Model):
     """
     code = models.CharField(max_length=255)
     name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
@@ -55,6 +59,8 @@ class Channel(models.Model):
     )
     website_url = models.TextField(validators=[URLValidator()], null=True, blank=True)
     logo_url = models.TextField(validators=[URLValidator()], null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f'{self.name} ({self.xmltv_id})'
@@ -75,6 +81,8 @@ class Guide(models.Model):
         null=True,
         blank=True
     )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.site_name} - {self.site_id}"
