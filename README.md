@@ -1,13 +1,13 @@
-﻿# IPTV Manager
+﻿# StreamWeaver
 
-A web application for managing IPTV services, TV schedules, and more.
+A self-hosted web application for managing IPTV services, TV guides, and more.
 
 ## Features
 
 - Real-time server monitoring (CPU and memory usage)
-- IPTV management (coming soon)
-- TV Schedule (coming soon)
-- Settings management (coming soon)
+- IPTV provider management
+- Playlist management
+- TV Guide (coming soon)
 
 ## Technology Stack
 

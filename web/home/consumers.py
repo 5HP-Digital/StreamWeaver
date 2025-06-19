@@ -6,11 +6,11 @@ from asyncio import Task
 import psutil
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from provider_manager.models import ProviderSyncJob, JobState, Provider
-from provider_manager.serializers import ProviderSyncJobSerializer, ProviderSerializer
+from job_manager.models import Job, JobState, JobType
+from job_manager.serializers import JobSerializer
+from provider_manager.models import Provider
 
 ACTIVE_JOBS_GROUP = 'active_jobs'
-JOB_DETAIL_GROUP_PREFIX = 'job_detail_'
 
 class SystemStatsConsumer(AsyncWebsocketConsumer):
     """
@@ -102,14 +102,15 @@ class ActiveJobsConsumer(AsyncWebsocketConsumer):
         """
         Get all active jobs (those in Queued or InProgress state)
         """
-        active_jobs = ProviderSyncJob.objects.filter(
+        active_jobs = Job.objects.filter(
+            type=JobType.PROVIDER_SYNC,
             state__in=[JobState.QUEUED, JobState.IN_PROGRESS]
         ).select_related('provider')
 
         # Create a list of active jobs with their provider IDs
         active_jobs_data = []
         for job in active_jobs:
-            job_serializer = ProviderSyncJobSerializer(job)
+            job_serializer = JobSerializer(job)
             active_jobs_data.append({
                 'job': job_serializer.data,
                 'provider_id': job.provider.id

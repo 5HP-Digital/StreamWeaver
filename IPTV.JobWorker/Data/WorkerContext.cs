@@ -1,11 +1,12 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Runtime.InteropServices.JavaScript;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace IPTV.JobWorker.Data;
 
 public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, TimeProvider timeProvider) : DbContext
 {
-    public DbSet<ProviderSyncJob> Jobs { get; set; }
+    public DbSet<Job> Jobs { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -22,23 +23,41 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
+        
         // ProviderSyncJob
         modelBuilder.Entity<ProviderSyncJob>(builder =>
         {
-            // Table
-            builder.ToTable("provider_manager_providersyncjob");
-            builder.HasKey(e => e.Id);
+            // Properties
+            builder.Property(e => e.AllowStreamAutoDeletion)
+                .IsRequired()
+                .HasDefaultValue(true);
 
+            // Relationships
+            builder.HasOne(e => e.Provider)
+                .WithMany(e => e.Jobs)
+                .IsRequired()
+                .HasForeignKey("provider_id")
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Job
+        modelBuilder.Entity<Job>(builder =>
+        {
+            // Table
+            builder.ToTable("job_manager_job");
+            builder.HasKey(e => e.Id);
+            builder.HasDiscriminator(j => j.Type)
+                .HasValue<ProviderSyncJob>(JobType.ProviderSync);
+            
             // Properties
             builder.Property(e => e.Id)
                 .ValueGeneratedOnAdd();
-
+            
             builder.Property(e => e.JobId)
                 .HasColumnType("varchar(32)")
                 .IsRequired()
                 .HasConversion<GuidToStringConverter>();
-
+            
             builder.Property(e => e.State)
                 .HasColumnType("varchar(20)")
                 .IsRequired()
@@ -57,9 +76,10 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
 
             builder.Property(e => e.MaxAttempts);
             
-            builder.Property(e => e.AllowStreamAutoDeletion)
+            builder.Property(e => e.Type)
+                .HasColumnType("varchar(20)")
                 .IsRequired()
-                .HasDefaultValue(true);
+                .HasConversion<EnumToStringConverter<JobType>>();
 
             builder.Property(e => e.CreatedAt)
                 .ValueGeneratedOnAdd()
@@ -68,17 +88,12 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
             builder.Property(e => e.UpdatedAt)
                 .ValueGeneratedOnAdd()
                 .IsRequired();
-
-            // Relationships
-            builder.HasOne(e => e.Provider)
-                .WithMany(e => e.Jobs)
-                .IsRequired()
-                .HasForeignKey("provider_id")
-                .OnDelete(DeleteBehavior.Cascade);
             
             // Indexes
             builder.HasIndex(nameof(ProviderSyncJob.JobId))
                 .IsUnique();
+
+            builder.HasIndex(nameof(ProviderSyncJob.State), nameof(Job.CreatedAt));
         });
 
         // Provider

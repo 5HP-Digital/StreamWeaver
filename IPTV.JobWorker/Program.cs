@@ -9,12 +9,22 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddSingleton(TimeProvider.System);
 
+// Options
+builder.Services.AddOptions<JobQueueOptions>()
+    .Configure(options =>
+        options.PollingInterval =
+            builder.Configuration.GetValue("JOB_QUEUE_POLLING_INTERVAL", JobQueueOptions.DefaultPollingInterval));
+
 // Sqlite
 builder.Services.AddDbContext<WorkerContext>();
 
+// Job runners
 builder.Services.AddScoped<ProviderSynchronizer>();
-builder.Services.AddHostedService<ProviderSyncJobQueueWorker>();
 
+// Background worker
+builder.Services.AddHostedService<PollingWorker>();
+
+// HttpClient
 builder.Services.AddHttpClient(nameof(ProviderSynchronizer),
     client =>
     {

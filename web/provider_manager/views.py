@@ -5,20 +5,21 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from math import ceil
 
-from .models import Provider, ProviderStream, ProviderSyncJob, JobState
+from .models import Provider, ProviderStream
+from job_manager.models import Job, JobState, JobType
+from job_manager.serializers import JobSerializer
 from .serializers import (
     ProviderSerializer,
     ProviderCreateSerializer,
     ProviderUpdateSerializer,
-    ProviderStreamSerializer,
-    ProviderSyncJobSerializer
+    ProviderStreamSerializer
 )
 from main.utils import ConfigStore
+
 
 class ProvidersViewSet(viewsets.ViewSet):
     """
     API endpoint for providers.
-    Based on IPTV.PlaylistManager/Controllers/SourcesControllers.cs
     """
 
     @action(detail=True, methods=['post'])
@@ -55,12 +56,11 @@ class ProvidersViewSet(viewsets.ViewSet):
 
         # Create the job
         job = provider.jobs.create(
+            type=JobType.PROVIDER_SYNC,
             state=JobState.QUEUED,
             max_attempts=1, # when running manual sync, allow one failure only
             allow_stream_auto_deletion=settings_data.get("allow_stream_auto_deletion")
         )
-
-        job.save()
 
         return Response({
             "job_id": str(job.job_id),
@@ -129,7 +129,7 @@ class ProvidersViewSet(viewsets.ViewSet):
                     "status": "unknown",
                     "message": f"Unknown job state: {job.state}"
                 })
-        except ProviderSyncJob.DoesNotExist:
+        except Job.DoesNotExist:
             return Response({
                 "job_id": job_id,
                 "status": "error",
@@ -233,13 +233,13 @@ class ProvidersViewSet(viewsets.ViewSet):
         provider = get_object_or_404(Provider, pk=pk)
 
         # Get active jobs (Queued or InProgress)
-        active_jobs = ProviderSyncJob.objects.filter(
+        active_jobs = Job.objects.filter(
             provider=provider,
             state__in=[JobState.QUEUED, JobState.IN_PROGRESS]
         ).order_by('-updated_at')
 
         # Get non-active jobs (Completed or Failed)
-        non_active_jobs = ProviderSyncJob.objects.filter(
+        non_active_jobs = Job.objects.filter(
             provider=provider,
             state__in=[JobState.COMPLETED, JobState.FAILED]
         )
@@ -260,7 +260,7 @@ class ProvidersViewSet(viewsets.ViewSet):
         response_data = {
             'page': page,
             'total': total_items,
-            'items': ProviderSyncJobSerializer(paginated_jobs, many=True).data,
+            'items': JobSerializer(paginated_jobs, many=True).data,
             'links': {}
         }
 
