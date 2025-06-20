@@ -110,9 +110,10 @@ class ActiveJobsConsumer(AsyncWebsocketConsumer):
         active_jobs_data = []
         for job in active_jobs:
             job_serializer = JobSerializer(job)
+            provide_id = job.provider.id if job.provider else None
             active_jobs_data.append({
                 'job': job_serializer.data,
-                'provider_id': job.provider.id
+                'provider_id': provide_id,
             })
 
         return active_jobs_data

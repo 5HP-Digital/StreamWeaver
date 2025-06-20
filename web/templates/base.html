@@ -71,7 +71,7 @@
                         <a class="nav-link" href="#">TV Guide</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">Settings</a>
+                        <a class="nav-link {% if request.path == '/settings/' %}active{% endif %}" href="{% url 'home:settings' %}">Settings</a>
                     </li>
                 </ul>
             </div>

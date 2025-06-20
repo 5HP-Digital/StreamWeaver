@@ -27,3 +27,10 @@ def channel_editor(request, playlist_id):
     View for the Channel Editor page
     """
     return render(request, 'home/channel_editor.html', {'playlist_id': playlist_id})
+
+
+def settings(request):
+    """
+    View for the Settings page
+    """
+    return render(request, 'home/settings.html')

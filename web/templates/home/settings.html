@@ -1,0 +1,255 @@
+﻿{% extends 'base.html' %}
+
+{% block extra_head %}
+<style>
+    .card {
+        margin-bottom: 20px;
+    }
+    .job-state-badge {
+        display: inline-block;
+        padding: 0.25em 0.4em;
+        font-size: 75%;
+        font-weight: 700;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 0.25rem;
+    }
+    .job-state-queued {
+        background-color: #17a2b8;
+        color: white;
+    }
+    .job-state-inprogress {
+        background-color: #ffc107;
+        color: black;
+    }
+    .job-state-completed {
+        background-color: #28a745;
+        color: white;
+    }
+    .job-state-failed {
+        background-color: #dc3545;
+        color: white;
+    }
+    .job-state-ready {
+        background-color: #6c757d;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="app">
+    <h1 class="h2 mb-4">Settings</h1>
+
+    <!-- EPG Section -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2 class="h4 mb-0">EPG Data</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info" v-if="loading">
+                <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                Loading EPG stats...
+            </div>
+
+            <div class="alert alert-danger" v-if="error">
+                [[ error ]]
+            </div>
+
+            <div v-if="!loading && !error">
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Guides</h5>
+                                <p class="card-text display-4">[[ stats.guides ]]</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Channels</h5>
+                                <p class="card-text display-4">[[ stats.channels ]]</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Countries</h5>
+                                <p class="card-text display-4">[[ stats.countries ]]</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Categories</h5>
+                                <p class="card-text display-4">[[ stats.categories ]]</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Last Synced</h5>
+                                <p class="card-text">[[ stats.last_synced ? formatDate(stats.last_synced) : 'Never' ]]</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Sync Status</h5>
+                                <p class="card-text">
+                                    <span v-if="stats.active_job" class="job-state-badge" :class="{
+                                        'job-state-queued': stats.active_job.state === 'Queued',
+                                        'job-state-inprogress': stats.active_job.state === 'InProgress'
+                                    }">[[ stats.active_job.state ]]</span>
+                                    <span v-else class="job-state-badge job-state-ready">Ready</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-primary" @click="syncEpgData" :disabled="stats.active_job !== null">
+                        <i class="bi" :class="stats.active_job ? 'bi-hourglass-split' : 'bi-arrow-repeat'"></i>
+                        <span v-if="stats.active_job">Syncing...</span>
+                        <span v-else>Sync Now</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Create Vue app
+    const app = new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            stats: {
+                guides: 0,
+                channels: 0,
+                countries: 0,
+                categories: 0,
+                last_synced: null,
+                active_job: null
+            },
+            loading: true,
+            error: null,
+            // WebSocket connection
+            activeJobsSocket: null
+        },
+        mounted() {
+            this.fetchStats();
+            
+            // Connect to active jobs WebSocket
+            this.connectToActiveJobsWebSocket();
+        },
+        beforeDestroy() {
+            // Disconnect WebSocket when component is destroyed
+            this.disconnectWebSockets();
+        },
+        methods: {
+            fetchStats() {
+                this.loading = true;
+                this.error = null;
+
+                axios.get('/api/guides/stats/')
+                    .then(response => {
+                        this.stats = response.data;
+                        this.loading = false;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching EPG stats:', error);
+                        this.error = 'Failed to load EPG stats. Please try again later.';
+                        this.loading = false;
+                    });
+            },
+            
+            syncEpgData() {
+                axios.post('/api/guides/sync/')
+                    .then(response => {
+                        console.log('EPG sync initiated:', response.data);
+
+                        // Refresh stats to show the new active job
+                        this.fetchStats();
+                    })
+                    .catch(error => {
+                        console.error('Error initiating EPG sync:', error);
+                        this.error = 'Failed to initiate EPG sync. Please try again later.';
+                    });
+            },
+            
+            formatDate(dateString) {
+                if (!dateString) return 'N/A';
+                const date = new Date(dateString);
+                return date.toLocaleString();
+            },
+            
+            // WebSocket methods
+            connectToActiveJobsWebSocket() {
+                // Close existing connection if any
+                if (this.activeJobsSocket) {
+                    this.activeJobsSocket.close();
+                }
+
+                // Create a new WebSocket connection
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/active-jobs/`;
+
+                this.activeJobsSocket = new WebSocket(wsUrl);
+
+                // Set up event handlers
+                this.activeJobsSocket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+
+                    if (data.type === 'active_jobs_update') {
+                        // Check if there's an active EPG sync job
+                        const epgJob = data.active_jobs.find(job => job.job.type === 'EpgDataSync');
+                        
+                        if (epgJob) {
+                            // Update active job
+                            this.stats.active_job = epgJobs[0].job;
+                        } else if (this.stats.active_job) {
+                            this.fetchStats();
+                        }
+                    }
+                };
+
+                this.activeJobsSocket.onclose = () => {
+                    console.log('Active jobs WebSocket connection closed');
+                    // Try to reconnect after a delay
+                    setTimeout(() => this.connectToActiveJobsWebSocket(), 5000);
+                };
+
+                this.activeJobsSocket.onerror = (error) => {
+                    console.error('Active jobs WebSocket error:', error);
+                };
+            },
+            
+            disconnectWebSockets() {
+                // Close active jobs WebSocket
+                if (this.activeJobsSocket) {
+                    this.activeJobsSocket.close();
+                    this.activeJobsSocket = null;
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
