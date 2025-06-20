@@ -1,4 +1,5 @@
-﻿using Digital5HP.Text.M3U;
+﻿using System.Collections.Immutable;
+using Digital5HP.Text.M3U;
 using EFCore.BulkExtensions;
 using IPTV.JobWorker.Data;
 using Microsoft.EntityFrameworkCore;
@@ -32,11 +33,13 @@ public class ProviderSynchronizer(
         logger.LogInformation("Document with {StreamCount} streams retrieved from {ProviderUrl}", document.Channels.Count, provider.Url);
         
         var streams = await workerContext.Streams.AsNoTracking()
+            .Include(s => s.Provider)
             .Where(s => s.Provider == provider)
             .ToListAsync(cancellationToken: cancellationToken);
         
-        // Index existing streams for the provider
-        var existingStreams = streams.ToDictionary(s => (s.Title, s.Group));
+        // Index existing streams for the provider, avoid duplicates
+        var existingStreams = streams.GroupBy(s => (s.Title, s.Group))
+            .ToImmutableDictionary(s => (s.Key.Title, s.Key.Group), g => g.First());
         
         logger.LogInformation("Indexed {StreamCount} existing streams", streams.Count);
 
@@ -47,14 +50,12 @@ public class ProviderSynchronizer(
         var streamsToUpdate = new List<ProviderStream>();
         foreach (var channel in document.Channels)
         {
-            var key = (channel.Title, channel.GroupTitle);
-            
             // Skip streams without a title or media URL
             if (string.IsNullOrWhiteSpace(channel.Title) || string.IsNullOrWhiteSpace(channel.MediaUrl))
                 continue;
             
             // Check if the stream already exists
-            if (existingStreams.TryGetValue(key, out var stream))
+            if (existingStreams.TryGetValue((channel.Title, channel.GroupTitle), out var stream))
             {
                 // Update existing stream
                 stream.Title = channel.Title;
