@@ -103,7 +103,6 @@ class ActiveJobsConsumer(AsyncWebsocketConsumer):
         Get all active jobs (those in Queued or InProgress state)
         """
         active_jobs = Job.objects.filter(
-            type=JobType.PROVIDER_SYNC,
             state__in=[JobState.QUEUED, JobState.IN_PROGRESS]
         ).select_related('provider')
 

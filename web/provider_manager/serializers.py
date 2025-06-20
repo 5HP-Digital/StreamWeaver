@@ -1,6 +1,6 @@
 ﻿from rest_framework import serializers
 from .models import Provider, ProviderStream
-from job_manager.models import JobState
+from job_manager.models import JobState, JobType
 
 
 class ProviderSerializer(serializers.ModelSerializer):
@@ -26,7 +26,7 @@ class ProviderSerializer(serializers.ModelSerializer):
         """
         Get the date of the last successful job.
         """
-        last_job = obj.jobs.filter(state=JobState.COMPLETED).order_by('-updated_at').first()
+        last_job = obj.jobs.filter(type=JobType.PROVIDER_SYNC, state=JobState.COMPLETED).order_by('-updated_at').first()
         if last_job:
             return last_job.updated_at
         return None
@@ -35,7 +35,7 @@ class ProviderSerializer(serializers.ModelSerializer):
         """
         Get whether an active sync job is in progress.
         """
-        active_jobs = obj.jobs.filter(state__in=[JobState.QUEUED, JobState.IN_PROGRESS])
+        active_jobs = obj.jobs.filter(type=JobType.PROVIDER_SYNC, state__in=[JobState.QUEUED, JobState.IN_PROGRESS])
         if active_jobs.exists():
             return active_jobs.first().job_id
         return None

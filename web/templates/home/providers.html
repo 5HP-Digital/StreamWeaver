@@ -1217,9 +1217,10 @@
             updateProvidersWithActiveJobs(activeJobs) {
                 // Create a map of provider IDs to active job IDs
                 const providerActiveJobs = {};
-                activeJobs.forEach(activeJob => {
-                    providerActiveJobs[activeJob.provider_id] = activeJob.job;
-                });
+                activeJobs.filter(activeJob => activeJob.job.type === 'ProviderSync')
+                    .forEach(activeJob => {
+                        providerActiveJobs[activeJob.provider_id] = activeJob.job;
+                    });
 
                 // Update each provider
                 let updateHistoryModal = false;

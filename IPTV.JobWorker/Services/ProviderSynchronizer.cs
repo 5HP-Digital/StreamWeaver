@@ -1,13 +1,14 @@
-﻿using System.Collections;
-using System.Collections.Specialized;
-using Digital5HP.Text.M3U;
+﻿using Digital5HP.Text.M3U;
+using EFCore.BulkExtensions;
 using IPTV.JobWorker.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace IPTV.JobWorker.Services;
 
 public class ProviderSynchronizer(
     WorkerContext workerContext, 
     IHttpClientFactory httpClientFactory, 
+    TimeProvider timeProvider,
     ILogger<ProviderSynchronizer> logger)
 {
     public async Task<(bool, string?)> Run(Provider provider, bool allowStreamAutoDeletion, CancellationToken cancellationToken)
@@ -30,21 +31,20 @@ public class ProviderSynchronizer(
         
         logger.LogInformation("Document with {StreamCount} streams retrieved from {ProviderUrl}", document.Channels.Count, provider.Url);
         
+        var streams = await workerContext.Streams.AsNoTracking()
+            .Where(s => s.Provider == provider)
+            .ToListAsync(cancellationToken: cancellationToken);
+        
         // Index existing streams for the provider
-        var existingStreams = new HybridDictionary(provider.Streams.Count);
-        foreach (var stream in provider.Streams)
-        {
-            existingStreams.Add((stream.Title, stream.Group), stream);
-        }
+        var existingStreams = streams.ToDictionary(s => (s.Title, s.Group));
         
-        logger.LogInformation("{StreamCount} existing streams indexed", provider.Streams.Count);
-        
-        // Track which streams were processed
-        var processedStreams = new HashSet<(string Title, string? Group)>();
+        logger.LogInformation("Indexed {StreamCount} existing streams", streams.Count);
+
+        await using var transaction = await workerContext.Database.BeginTransactionAsync(cancellationToken);
         
         // Sync streams
-        var added = 0;
-        var updated = 0;
+        var streamsToAdd = new List<ProviderStream>();
+        var streamsToUpdate = new List<ProviderStream>();
         foreach (var channel in document.Channels)
         {
             var key = (channel.Title, channel.GroupTitle);
@@ -53,29 +53,24 @@ public class ProviderSynchronizer(
             if (string.IsNullOrWhiteSpace(channel.Title) || string.IsNullOrWhiteSpace(channel.MediaUrl))
                 continue;
             
-            // Skip duplicate streams
-            // Currently, we don't support multiple streams with the same title and group
-            if (processedStreams.Contains(key))
-                continue;
-            
             // Check if the stream already exists
-            if (existingStreams.Contains(key))
+            if (existingStreams.TryGetValue(key, out var stream))
             {
                 // Update existing stream
-                var streamToUpdate = (ProviderStream)existingStreams[key]!;
-                streamToUpdate.Title = channel.Title;
-                streamToUpdate.TvgId = channel.TvgId;
-                streamToUpdate.MediaUrl = channel.MediaUrl;
-                streamToUpdate.LogoUrl = channel.LogoUrl;
-                streamToUpdate.Group = channel.GroupTitle;
-                streamToUpdate.IsActive = true;
+                stream.Title = channel.Title;
+                stream.TvgId = channel.TvgId;
+                stream.MediaUrl = channel.MediaUrl;
+                stream.LogoUrl = channel.LogoUrl;
+                stream.Group = channel.GroupTitle;
+                stream.IsActive = true;
+                stream.UpdatedAt = timeProvider.GetUtcNow().DateTime;
                 
-                updated++;
+                streamsToUpdate.Add(stream);
             }
             else
             {
                 // Create a new stream
-                provider.Streams.Add(new ProviderStream
+                streamsToAdd.Add(new ProviderStream
                 {
                     Title = channel.Title,
                     TvgId = channel.TvgId,
@@ -83,44 +78,41 @@ public class ProviderSynchronizer(
                     LogoUrl = channel.LogoUrl,
                     Group = channel.GroupTitle,
                     IsActive = true,
+                    Provider = provider,
+                    CreatedAt = timeProvider.GetUtcNow().DateTime,
+                    UpdatedAt = timeProvider.GetUtcNow().DateTime
                 });
-
-                added++;
             }
-            
-            // Mark as processed
-            processedStreams.Add(key);
         }
-        
-        logger.LogInformation("{Updated} streams updated; {Added} streams added", updated, added);
         
         // Handle streams that weren't in the m3u file
-        var deleted = 0;
-        foreach (var stream in from DictionaryEntry entry in existingStreams 
-                 let key = ((string Title, string? Group))entry.Key 
-                 let stream = (ProviderStream)entry.Value! 
-                 where !processedStreams.Contains(key) 
-                 select stream)
-        {
-            if (allowStreamAutoDeletion)
-            {
-                // Delete stream
-                provider.Streams.Remove(stream);
-            }
-            else
-            {
-                // Mark as inactive
-                stream.IsActive = false;
-            }
+        var validStreams = document.Channels.Select(c => (c.Title, (string?)c.GroupTitle)).ToHashSet();
+        var streamsToRemove = streams.Where(s => !validStreams.Contains((s.Title, s.Group))).ToList();
             
-            deleted++;
+        // Save changes
+        await workerContext.BulkInsertAsync(streamsToAdd, cancellationToken: cancellationToken);
+        await workerContext.BulkUpdateAsync(streamsToUpdate, cancellationToken: cancellationToken);
+        
+        if (allowStreamAutoDeletion)
+        {
+            await workerContext.BulkDeleteAsync(streamsToRemove, cancellationToken: cancellationToken);
+        }
+        else
+        {
+            var now = timeProvider.GetUtcNow().DateTime;
+            streamsToRemove.ForEach(stream =>
+            {
+                stream.IsActive = false;
+                stream.UpdatedAt = now;
+            });
+            await workerContext.BulkUpdateAsync(streamsToRemove, cancellationToken: cancellationToken);
         }
         
-        logger.LogInformation("{Deleted} streams deleted", deleted);
+        await transaction.CommitAsync(cancellationToken);
+
+        logger.LogInformation("Streams synced ({Added} added;{Updated} updated;{Removed} removed)", 
+            streamsToAdd.Count, streamsToUpdate.Count, streamsToRemove.Count);
         
-        // Save changes
-        await workerContext.SaveChangesAsync(cancellationToken: cancellationToken);
-        
-        return (true, $"Service provider streams synced: {added} added; {updated} updated; {deleted} deleted");
+        return (true, $"Synced {streamsToAdd.Count + streamsToUpdate.Count} streams");
     }
 }

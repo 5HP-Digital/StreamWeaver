@@ -19,6 +19,8 @@ public class EpgOrgDataSynchronizer(
     {
         using var client = httpClientFactory.CreateClient();
 
+        await using var transaction = await workerContext.Database.BeginTransactionAsync(cancellationToken);
+
         int countriesCount, categoriesCount, channelsCount, guidesCount;
         
         // Sync countries
@@ -262,6 +264,8 @@ public class EpgOrgDataSynchronizer(
             
             guidesCount = jsonGuides.Length;
         }
+        
+        await transaction.CommitAsync(cancellationToken);
         
         return (true, $"Data synced (countries: {countriesCount}; categories: {categoriesCount}; channels: {channelsCount}; guides: {guidesCount})");
     }

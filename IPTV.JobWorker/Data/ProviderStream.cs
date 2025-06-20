@@ -11,4 +11,6 @@ public class ProviderStream : ITimestampable
     public bool IsActive{ get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    public virtual required Provider Provider { get; set; }
 }

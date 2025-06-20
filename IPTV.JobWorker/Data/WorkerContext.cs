@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using IPTV.JobWorker.Data.Comparers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace IPTV.JobWorker.Data;
@@ -7,6 +8,9 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
 {
     // Jobs
     public DbSet<Job> Jobs { get; set; }
+    
+    // Provider Streams
+    public DbSet<ProviderStream> Streams { get; set; }
 
     // Guides
     public DbSet<Category> Categories { get; set; }
@@ -181,6 +185,12 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
             builder.Property(e => e.UpdatedAt)
                 .ValueGeneratedOnAdd()
                 .IsRequired();
+            
+            // Relationships
+            builder.HasOne(e => e.Provider)
+                .WithMany(e => e.Streams)
+                .HasForeignKey("provider_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Category
@@ -266,7 +276,8 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
             builder.Property(e => e.Categories)
                 .HasMaxLength(255)
                 .HasConversion<string>(arr => string.Join(';', arr),
-                    str => str.Split(';', StringSplitOptions.None));
+                    str => str.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                .Metadata.SetValueComparer(new StringArrayComparer());
 
             builder.Property(e => e.IsNsfw)
                 .IsRequired()
