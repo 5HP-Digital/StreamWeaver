@@ -104,9 +104,9 @@
                             <th>Ch #</th>
                             <th>Logo</th>
                             <th>Title</th>
-                            <th>TVG ID</th>
                             <th>Category</th>
                             <th>Stream</th>
+                            <th>TV Guide</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -127,10 +127,12 @@
                                      @error="handleLogoError">
                             </td>
                             <td>[[ channel.title || channel.provider_stream.title ]]</td>
-                            <td>[[ channel.tvg_id || channel.provider_stream.tvg_id ]]</td>
                             <td>[[ channel.category ]]</td>
                             <td @click="showStreamDetails(channel, $event)" style="cursor: pointer;">
                                 <span>[[ channel.provider_stream.title ]]</span>
+                            </td>
+                            <td>
+                                <span v-if="channel.guide">[[ channel.guide.site_name + (channel.guide.channel ? ' (' + channel.guide.channel + ')' : '') ]]</span>
                             </td>
                             <td>
                                 <button class="btn btn-sm btn-primary me-1" @click="showEditChannelModal(channel)">

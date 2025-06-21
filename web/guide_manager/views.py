@@ -151,13 +151,14 @@ class GuidesViewSet(viewsets.ViewSet):
 
         queryset = Guide.objects.all().order_by('site_name')
 
-        # Text search in site, site_id, site_name
+        # Text search in site, site_id, site_name, xmltv_id
         q = request.query_params.get('q')
         if q:
             queryset = queryset.filter(
                 Q(site__icontains=q) | 
                 Q(site_id__icontains=q) | 
-                Q(site_name__icontains=q)
+                Q(site_name__icontains=q) |
+                Q(xmltv_id__icontains=q)
             )
 
         # Filter by language
@@ -281,3 +282,17 @@ class GuidesViewSet(viewsets.ViewSet):
             "status": "queued",
             "message": "EPG data sync job queued successfully"
         })
+
+
+class LanguagesViewSet(viewsets.ViewSet):
+    """
+    API endpoint for languages.
+    """
+
+    def list(self, request):
+        languages = Guide.objects.values('lang').order_by('lang').values_list('lang', flat=True).distinct()
+
+        response_data = {
+            'items': languages,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)

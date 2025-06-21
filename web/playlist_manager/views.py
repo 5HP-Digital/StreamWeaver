@@ -55,7 +55,8 @@ class PlaylistsViewSet(viewsets.ViewSet):
             # Create the playlist with the calculated order
             playlist = Playlist.objects.create(
                 name=serializer.validated_data['name'],
-                starting_channel_number=serializer.validated_data.get('starting_channel_number', 1)
+                starting_channel_number=serializer.validated_data.get('starting_channel_number', 1),
+                default_lang=serializer.validated_data.get('default_lang', 'en')
             )
 
             return Response(
@@ -75,6 +76,8 @@ class PlaylistsViewSet(viewsets.ViewSet):
                 playlist.name = serializer.validated_data['name']
             if 'starting_channel_number' in serializer.validated_data:
                 playlist.starting_channel_number = serializer.validated_data['starting_channel_number']
+            if 'default_lang' in serializer.validated_data:
+                playlist.default_lang = serializer.validated_data['default_lang']
 
             playlist.save()
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -127,7 +130,7 @@ class PlaylistsViewSet(viewsets.ViewSet):
             skip = (page - 1) * size
 
             # Get the channels for the current page, ordered by order
-            channels = query.select_related('provider_stream', 'provider_stream__provider').order_by('order')[skip:skip+size]
+            channels = query.select_related('provider_stream', 'provider_stream__provider', 'guide').order_by('order')[skip:skip+size]
 
             # Create response with pagination links
             base_url = request.build_absolute_uri().split('?')[0]
@@ -162,7 +165,6 @@ class PlaylistsViewSet(viewsets.ViewSet):
                 # Create the playlist channel
                 channel = PlaylistChannel.objects.create(
                     title=serializer.validated_data.get('title'),
-                    tvg_id=serializer.validated_data.get('tvg_id'),
                     category=serializer.validated_data.get('category'),
                     logo_url=serializer.validated_data.get('logo_url'),
                     playlist=playlist,
@@ -324,8 +326,6 @@ class ChannelsViewSet(viewsets.ViewSet):
             # Update the fields that are present in the request
             if 'title' in serializer.validated_data:
                 channel.title = serializer.validated_data['title']
-            if 'tvg_id' in serializer.validated_data:
-                channel.tvg_id = serializer.validated_data['tvg_id']
             if 'category' in serializer.validated_data:
                 channel.category = serializer.validated_data['category']
             if 'logo_url' in serializer.validated_data:
