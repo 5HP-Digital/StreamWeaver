@@ -41,6 +41,11 @@ class Channel(models.Model):
     website_url = models.TextField(validators=[URLValidator()], null=True, blank=True)
     logo_url = models.TextField(validators=[URLValidator()], null=True, blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['xmltv_id'], name='channel_xmltv_id_idx'),
+        ]
+
     def __str__(self):
         return f'{self.name} ({self.xmltv_id})'
 
@@ -54,6 +59,13 @@ class Guide(models.Model):
     site_name = models.CharField(max_length=255)
     lang = models.CharField(max_length=20)
     xmltv_id = models.CharField(max_length=20, null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['xmltv_id'], name='guide_xmltv_id_idx'),
+            models.Index(fields=['site', 'site_id', 'site_name'], name='guide_site_site_id_name_idx'),
+            models.Index(fields=['lang'], name='guide_lang_idx'),
+        ]
 
     def __str__(self):
         return f"{self.site_name} - {self.site_id}"

@@ -5,8 +5,8 @@ from .views import ProvidersViewSet, ProviderStreamsViewSet
 
 router = DefaultRouter()
 router.register(r'providers', ProvidersViewSet, basename='providers')
+router.register(r'streams', ProviderStreamsViewSet, basename='streams')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('providers/<int:provider_id>/streams/', ProviderStreamsViewSet.as_view({'get': 'list'}), name='provider-streams'),
 ]

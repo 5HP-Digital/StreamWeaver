@@ -1,3 +1,4 @@
+from django.db.models import F, Q, OuterRef, Subquery, Value, TextField, IntegerField
 from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
@@ -8,6 +9,8 @@ from math import ceil
 from .models import Provider, ProviderStream
 from job_manager.models import Job, JobState, JobType
 from job_manager.serializers import JobSerializer
+from guide_manager.models import Guide, Channel
+from guide_manager.serializers import GuideSerializer
 from .serializers import (
     ProviderSerializer,
     ProviderCreateSerializer,
@@ -275,14 +278,8 @@ class ProvidersViewSet(viewsets.ViewSet):
 
         return Response(response_data)
 
-
-class ProviderStreamsViewSet(viewsets.ViewSet):
-    """
-    API endpoint for provider streams.
-    Based on IPTV.PlaylistManager/Controllers/ChannelsControllers.cs
-    """
-
-    def list(self, request, provider_id=None):
+    @action(detail=True, methods=['get'])
+    def streams(self, request, pk=None):
         """
         Get streams for a specific provider with pagination.
         """
@@ -303,7 +300,7 @@ class ProviderStreamsViewSet(viewsets.ViewSet):
             )
 
         # Check if provider exists
-        provider = get_object_or_404(Provider, pk=provider_id)
+        provider = get_object_or_404(Provider, pk=pk)
 
         # Get total count of streams for this provider
         query = ProviderStream.objects.filter(provider=provider)
@@ -336,3 +333,84 @@ class ProviderStreamsViewSet(viewsets.ViewSet):
             response_data['links']['last'] = f"{base_url}?page={total_pages}&size={size}"
 
         return Response(response_data)
+
+
+class ProviderStreamsViewSet(viewsets.ViewSet):
+    """
+    API endpoint for provider streams.
+    """
+
+    @action(detail=True, methods=['get'])
+    def guides(self, request, pk=None):
+        """
+        Get guide suggestions for a specific stream.
+
+        Query Parameters:
+            title: Optional. When provided, replaces the use of Stream.title in the matching rules.
+            max_results: Optional. Max number of results returned. Defaults to 5. Must be between 1 and 20.
+
+        Returns:
+            Response: A response containing guide suggestions for the stream.
+        """
+        # Get the stream
+        stream = get_object_or_404(ProviderStream, pk=pk)
+
+        # Get query parameters
+        title = request.query_params.get('title', stream.title)
+        try:
+            max_results = int(request.query_params.get('max_results', 5))
+            if max_results < 1 or max_results > 20:
+                return Response(
+                    {"error": "max_results must be between 1 and 20"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except ValueError:
+            return Response(
+                {"error": "max_results must be an integer"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not title:
+            return Response(
+                {"error": "title is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Apply matching rules
+        query = Guide.objects.all()
+
+        # Rule 1: Stream.tvg_id matches exactly Guide.xmltv_id
+        xmltv_matches = query.annotate(
+            related_channel_name=Subquery(
+                Channel.objects.filter(xmltv_id=OuterRef('xmltv_id')).values('name')[:1]
+            ),
+            title_val=Value(title, output_field=TextField()),
+            weight=Value(10, output_field=IntegerField())
+        ).filter(xmltv_id__iexact=stream.tvg_id) if stream.tvg_id else query.none()
+
+        # Rule 2: Channel.name contains title
+        title_matches = query.annotate(
+            related_channel_name=Subquery(
+                Channel.objects.filter(xmltv_id=OuterRef('xmltv_id')).values('name')[:1]
+            ),
+            title_val=Value(title, output_field=TextField()),
+            weight=Value(5, output_field=IntegerField())
+        ).filter(related_channel_name__icontains=title)
+
+        # Rule 3: title contains Channel.name
+        channel_name_matches = query.annotate(
+            related_channel_name=Subquery(
+                Channel.objects.filter(xmltv_id=OuterRef('xmltv_id')).values('name')[:1]
+            ),
+            title_val=Value(title, output_field=TextField()),
+            weight=Value(1, output_field=IntegerField())
+        ).filter(title_val__icontains=F('related_channel_name'))
+
+        suggestions = xmltv_matches.union(title_matches).union(channel_name_matches).order_by('-weight')
+
+        # Limit results
+        suggestions = suggestions[:max_results]
+
+        # Serialize and return
+        serializer = GuideSerializer(suggestions, many=True)
+        return Response(serializer.data)
