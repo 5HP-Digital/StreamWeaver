@@ -149,16 +149,17 @@ class GuidesViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        queryset = Guide.objects.all().order_by('site_name')
+        queryset = Guide.objects.all().select_related('channel')
 
-        # Text search in site, site_id, site_name, xmltv_id
+        # Text search in site, site_id, site_name, xmltv_id, channel__name
         q = request.query_params.get('q')
         if q:
             queryset = queryset.filter(
                 Q(site__icontains=q) | 
                 Q(site_id__icontains=q) | 
                 Q(site_name__icontains=q) |
-                Q(xmltv_id__icontains=q)
+                Q(xmltv_id__icontains=q) |
+                Q(channel__name__icontains=q)
             )
 
         # Filter by language
@@ -166,10 +167,15 @@ class GuidesViewSet(viewsets.ViewSet):
         if lang:
             queryset = queryset.filter(lang=lang)
 
-        # Filter by channel (xmltv_id)
-        channel = request.query_params.get('channel')
-        if channel:
-            queryset = queryset.filter(xmltv_id=channel)
+        # Filter by xmltv_id
+        xmltv_id = request.query_params.get('xmltv_id')
+        if xmltv_id:
+            queryset = queryset.filter(xmltv_id=xmltv_id)
+
+        # Filter by country
+        country = request.query_params.get('country')
+        if country:
+            queryset = queryset.filter(country=country)
 
         # Get total count
         total_items = queryset.count()
@@ -179,7 +185,7 @@ class GuidesViewSet(viewsets.ViewSet):
         skip = (page - 1) * size
 
         # Get the guides for the current page
-        guides = queryset[skip:skip+size]
+        guides = queryset.order_by('site_name')[skip:skip+size]
 
         # Create response with pagination links
         base_url = request.build_absolute_uri().split('?')[0]
