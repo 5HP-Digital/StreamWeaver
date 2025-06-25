@@ -29,7 +29,7 @@ class Channel(models.Model):
     """
     Model representing a channel.
     """
-    xmltv_id = models.CharField(max_length=20)
+    xmltv_id = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=255)
     network = models.CharField(max_length=255, null=True, blank=True)
     country = models.CharField(max_length=20)
@@ -58,11 +58,19 @@ class Guide(models.Model):
     site_id = models.CharField(max_length=255)
     site_name = models.CharField(max_length=255)
     lang = models.CharField(max_length=20)
-    xmltv_id = models.CharField(max_length=20, null=True, blank=True)
+    channel = models.ForeignKey(
+        Channel,
+        on_delete=models.SET_NULL,
+        related_name='guides',
+        to_field='xmltv_id',
+        db_column='xmltv_id',
+        db_index=True,
+        null=True,
+        blank=True
+    )
 
     class Meta:
         indexes = [
-            models.Index(fields=['xmltv_id'], name='guide_xmltv_id_idx'),
             models.Index(fields=['site', 'site_id', 'site_name'], name='guide_site_site_id_name_idx'),
             models.Index(fields=['lang'], name='guide_lang_idx'),
         ]

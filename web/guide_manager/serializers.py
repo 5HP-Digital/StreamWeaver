@@ -25,7 +25,7 @@ class ChannelSerializer(serializers.ModelSerializer):
     Serializer for Channel model.
     """
     categories = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Channel
         fields = [
@@ -33,7 +33,7 @@ class ChannelSerializer(serializers.ModelSerializer):
             'categories', 'is_nsfw', 'launched_at', 'closed_at', 
             'website_url', 'logo_url'
         ]
-    
+
     def get_categories(self, obj):
         """
         Convert the comma-separated categories string to an array of strings.
@@ -47,14 +47,8 @@ class GuideSerializer(serializers.ModelSerializer):
     """
     Serializer for Guide model.
     """
-    channel = serializers.SerializerMethodField()
-    
+    channel = ChannelSerializer(read_only=True)
+
     class Meta:
         model = Guide
         fields = ['id', 'site', 'site_id', 'site_name', 'lang', 'channel']
-    
-    def get_channel(self, obj):
-        """
-        Return the xmltv_id as the channel identifier.
-        """
-        return obj.xmltv_id
