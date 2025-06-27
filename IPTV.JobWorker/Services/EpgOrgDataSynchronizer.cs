@@ -134,6 +134,7 @@ public class EpgOrgDataSynchronizer(
         }
         
         // Sync channels
+        HashSet<string> validXmltvIds = null!;
         await using (var channelStream = await client.GetStreamAsync(ChannelApiUrl, cancellationToken))
         {
             var jsonChannels = await JsonSerializer.DeserializeAsync<JsonChannel[]>(channelStream, cancellationToken: cancellationToken);
@@ -162,8 +163,8 @@ public class EpgOrgDataSynchronizer(
                     channel.City = jsonChannel.city;
                     channel.Categories = jsonChannel.categories;
                     channel.IsNsfw = jsonChannel.is_nsfw;
-                    channel.LaunchedAt = DateOnly.TryParse(jsonChannel.launched, out var launched) ? launched : default;
-                    channel.ClosedAt = DateOnly.TryParse(jsonChannel.closed, out var closed) ? closed : default;
+                    channel.LaunchedAt = DateOnly.TryParse(jsonChannel.launched, out var launched) ? launched : null;
+                    channel.ClosedAt = DateOnly.TryParse(jsonChannel.closed, out var closed) ? closed : null;
                     channel.LogoUrl = jsonChannel.logo;
                     channel.WebsiteUrl = jsonChannel.website;
 
@@ -181,8 +182,8 @@ public class EpgOrgDataSynchronizer(
                         City = jsonChannel.city,
                         Categories = jsonChannel.categories,
                         IsNsfw = jsonChannel.is_nsfw,
-                        LaunchedAt = DateOnly.TryParse(jsonChannel.launched, out var launched) ? launched : default,
-                        ClosedAt = DateOnly.TryParse(jsonChannel.closed, out var closed) ? closed : default,
+                        LaunchedAt = DateOnly.TryParse(jsonChannel.launched, out var launched) ? launched : null,
+                        ClosedAt = DateOnly.TryParse(jsonChannel.closed, out var closed) ? closed : null,
                         LogoUrl = jsonChannel.logo,
                         WebsiteUrl = jsonChannel.website
                     });
@@ -190,8 +191,8 @@ public class EpgOrgDataSynchronizer(
             }
 
             // Remove channels that don't exist in JSON
-            var validCodes = jsonChannels.Select(c => c.id).ToHashSet();
-            var channelsToRemove = channels.Where(c => !validCodes.Contains(c.XmltvId)).ToList();
+            validXmltvIds = jsonChannels.Select(c => c.id).ToHashSet();
+            var channelsToRemove = channels.Where(c => !validXmltvIds.Contains(c.XmltvId)).ToList();
             
             // Save changes
             await workerContext.BulkInsertAsync(channelsToAdd, cancellationToken: cancellationToken);
@@ -225,12 +226,17 @@ public class EpgOrgDataSynchronizer(
             var guidesToUpdate = new List<Guide>();
             foreach (var jsonGuide in jsonGuides)
             {
+                // Check if XMLTV ID exists. If not, set to null. 
+                var channelXmltvId = jsonGuide.channel != null && validXmltvIds.Contains(jsonGuide.channel)
+                    ? jsonGuide.channel
+                    : null;
+                
                 if (existingGuides.TryGetValue((jsonGuide.site, jsonGuide.site_id, jsonGuide.lang), out var guidesForKey))
                 {
                     foreach (var guide in guidesForKey)
                     {
                         // Update existing guide
-                        guide.XmltvId = jsonGuide.channel;
+                        guide.XmltvId = channelXmltvId;
                         guide.SiteName = jsonGuide.site_name;
 
                         guidesToUpdate.Add(guide);
@@ -241,7 +247,7 @@ public class EpgOrgDataSynchronizer(
                     // Add new guide
                     guidesToAdd.Add(new Guide
                     {
-                        XmltvId = jsonGuide.channel,
+                        XmltvId = channelXmltvId,
                         Site = jsonGuide.site,
                         SiteId = jsonGuide.site_id,
                         SiteName = jsonGuide.site_name,

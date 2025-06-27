@@ -124,7 +124,7 @@ public class PollingWorker(
             {
                 job.State = JobState.Failed;
                 job.StatusDescription =
-                    $"Error processing job: {ex.Message}. Last attempt reached.";
+                    $"Error processing job: {ex.Message.TrimEnd('.')}. Last attempt reached.";
             }
 
             await workerContext.SaveChangesAsync(cancellationToken: stoppingToken);
