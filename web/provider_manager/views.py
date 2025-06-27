@@ -380,24 +380,21 @@ class ProviderStreamsViewSet(viewsets.ViewSet):
         query = Guide.objects.all().select_related('channel')
 
         # Rule 1: Stream.tvg_id matches exactly Guide.xmltv_id
-        xmltv_matches = query.annotate(
-            title_val=Value(title, output_field=TextField()),
-            weight=Value(10, output_field=IntegerField())
-        ).filter(xmltv_id__iexact=stream.tvg_id) if stream.tvg_id else query.none()
+        xmltv_matches = query.alias(
+            title_val=Value(title, output_field=TextField())
+        ).filter(channel__xmltv_id__iexact=stream.tvg_id) if stream.tvg_id else query.none()
 
         # Rule 2: Channel.name contains title
-        title_matches = query.annotate(
-            title_val=Value(title, output_field=TextField()),
-            weight=Value(5, output_field=IntegerField())
+        title_matches = query.alias(
+            title_val=Value(title, output_field=TextField())
         ).filter(channel__name__icontains=title)
 
         # Rule 3: title contains Channel.name
-        channel_name_matches = query.annotate(
-            title_val=Value(title, output_field=TextField()),
-            weight=Value(1, output_field=IntegerField())
+        channel_name_matches = query.alias(
+            title_val=Value(title, output_field=TextField())
         ).filter(title_val__icontains=F('channel__name'))
 
-        suggestions = xmltv_matches.union(title_matches).union(channel_name_matches).order_by('-weight')
+        suggestions = xmltv_matches.union(title_matches).union(channel_name_matches)
 
         # Limit results
         suggestions = suggestions[:max_results]

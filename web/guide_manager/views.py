@@ -158,7 +158,7 @@ class GuidesViewSet(viewsets.ViewSet):
                 Q(site__icontains=q) | 
                 Q(site_id__icontains=q) | 
                 Q(site_name__icontains=q) |
-                Q(xmltv_id__icontains=q) |
+                Q(channel__xmltv_id__icontains=q) |
                 Q(channel__name__icontains=q)
             )
 
@@ -175,7 +175,7 @@ class GuidesViewSet(viewsets.ViewSet):
         # Filter by country
         country = request.query_params.get('country')
         if country:
-            queryset = queryset.filter(country=country)
+            queryset = queryset.filter(channel__country=country)
 
         # Get total count
         total_items = queryset.count()

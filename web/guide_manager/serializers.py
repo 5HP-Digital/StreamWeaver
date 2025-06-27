@@ -39,7 +39,7 @@ class ChannelSerializer(serializers.ModelSerializer):
         Convert the comma-separated categories string to an array of strings.
         """
         if obj.categories:
-            return [category.strip() for category in obj.categories.split(',')]
+            return [category.strip() for category in obj.categories.split(';')]
         return []
 
 

@@ -132,12 +132,21 @@
                                 <span>[[ channel.provider_stream.title ]]</span>
                             </td>
                             <td>
-                                <span v-if="channel.guide">[[ channel.guide.site_name + (channel.guide.channel ? ' (' + channel.guide.channel + ')' : '') ]]</span>
+                                <span v-if="channel.guide">[[ channel.guide.site_name + (channel.guide.channel ? ' (' + channel.guide.channel.xmltv_id + ')' : '') ]]</span>
                             </td>
                             <td>
                                 <button class="btn btn-sm btn-primary me-1" @click="showEditChannelModal(channel)">
                                     <i class="bi bi-pencil"></i> Edit
                                 </button>
+                                <div class="btn-group me-1">
+                                    <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                        TV Guide
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" @click.prevent="autoSelectGuide(channel)">Auto-Select</a></li>
+                                        <li><a class="dropdown-item" href="#" @click.prevent="showGuideSearchModal(channel)">Search...</a></li>
+                                    </ul>
+                                </div>
                                 <button class="btn btn-sm btn-danger" @click="confirmDeleteChannel(channel)">
                                     <i class="bi bi-trash"></i> Delete
                                 </button>
@@ -319,6 +328,353 @@
                     <button type="button" class="btn btn-danger" @click="deleteChannel" :disabled="formSubmitting">
                         <span v-if="formSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                         Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide Search Modal -->
+    <div class="modal fade" id="guideSearchModal" tabindex="-1" aria-labelledby="guideSearchModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="guideSearchModalLabel">Search TV Guide</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="guideSearchTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="suggestions-tab" data-bs-toggle="tab" data-bs-target="#suggestions-tab-pane" 
+                                    type="button" role="tab" aria-controls="suggestions-tab-pane" aria-selected="true"
+                                    @click="loadGuideSuggestions">
+                                Suggestions
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="all-guides-tab" data-bs-toggle="tab" data-bs-target="#all-guides-tab-pane" 
+                                    type="button" role="tab" aria-controls="all-guides-tab-pane" aria-selected="false"
+                                    @click="loadAllGuides(allGuidesCurrentPage)">
+                                All
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="guideSearchTabsContent">
+                        <!-- Suggestions Tab -->
+                        <div class="tab-pane fade show active" id="suggestions-tab-pane" role="tabpanel" aria-labelledby="suggestions-tab" tabindex="0">
+                            <div v-if="guideSuggestionsLoading" class="text-center p-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-3">Loading guide suggestions...</p>
+                            </div>
+
+                            <div v-else-if="guideSuggestionsError" class="alert alert-danger">
+                                [[ guideSuggestionsError ]]
+                            </div>
+
+                            <div v-else-if="guideSuggestions.length === 0" class="alert alert-info">
+                                No guide suggestions found for this channel.
+                            </div>
+
+                            <div v-else class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Logo</th>
+                                            <th>Site</th>
+                                            <th>Site Name</th>
+                                            <th>Language</th>
+                                            <th>XMLTV ID</th>
+                                            <th>Channel Name</th>
+                                            <th>City</th>
+                                            <th>Country</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="guide in guideSuggestions" :key="guide.id">
+                                            <td>
+                                                <img v-if="guide.channel && guide.channel.logo_url" 
+                                                     :src="guide.channel.logo_url" 
+                                                     class="channel-logo" alt="Channel logo"
+                                                     @error="handleLogoError">
+                                            </td>
+                                            <td>[[ guide.site ]]</td>
+                                            <td>[[ guide.site_name ]]</td>
+                                            <td>[[ guide.lang ]]</td>
+                                            <td v-if="guide.channel">[[ guide.channel.xmltv_id ]]</td>
+                                            <td v-else></td>
+                                            <td v-if="guide.channel">[[ guide.channel.name ]]</td>
+                                            <td v-else></td>
+                                            <td v-if="guide.channel">[[ guide.channel.city ]]</td>
+                                            <td v-else></td>
+                                            <td v-if="guide.channel">[[ guide.channel.country ]]</td>
+                                            <td v-else></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-primary" @click="selectGuide(guide)">
+                                                    Select
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- All Guides Tab -->
+                        <div class="tab-pane fade" id="all-guides-tab-pane" role="tabpanel" aria-labelledby="all-guides-tab" tabindex="0">
+
+                            <div v-if="allGuidesLoading" class="text-center p-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-3">Loading guides...</p>
+                            </div>
+
+                            <div v-else-if="allGuidesError" class="alert alert-danger">
+                                [[ allGuidesError ]]
+                            </div>
+
+                            <div v-else-if="allGuides.length === 0" class="alert alert-info">
+                                No guides found matching your criteria.
+                                <button v-if="allGuidesFilters.q || allGuidesFilters.lang || allGuidesFilters.country"
+                                        type="button" class="btn btn-sm btn-outline-secondary float-end"
+                                        @click="clearGuideFilterAll">
+                                    Clear Filters
+                                </button>
+                            </div>
+
+                            <div v-else>
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Logo</th>
+                                                <th>
+                                                    Site
+                                                    <i :class='"bi bi-funnel" + (allGuidesFilters.q ? "-fill" : "") + " ms-1" + (allGuidesFilters.q ? " text-primary" : "" )'
+                                                       @click.stop="showGuideFilter($event, 'q')"></i>
+                                                </th>
+                                                <th>Site Name</th>
+                                                <th>
+                                                    Language
+                                                    <i :class='"bi bi-funnel" + (allGuidesFilters.lang ? "-fill" : "") + " ms-1" + (allGuidesFilters.lang ? " text-primary" : "" )'
+                                                       @click.stop="showGuideFilter($event, 'lang')"></i>
+                                                </th>
+                                                <th>XMLTV ID</th>
+                                                <th>Channel Name</th>
+                                                <th>City</th>
+                                                <th>
+                                                    Country
+                                                    <i :class='"bi bi-funnel" + (allGuidesFilters.country ? "-fill" : "") + " ms-1" + (allGuidesFilters.country ? " text-primary" : "" )'
+                                                       @click.stop="showGuideFilter($event, 'country')"></i>
+                                                </th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="guide in allGuides" :key="guide.id">
+                                                <td>
+                                                    <img v-if="guide.channel && guide.channel.logo_url" 
+                                                         :src="guide.channel.logo_url" 
+                                                         class="channel-logo" alt="Channel logo"
+                                                         @error="handleLogoError">
+                                                </td>
+                                                <td>[[ guide.site ]]</td>
+                                                <td>[[ guide.site_name ]]</td>
+                                                <td>[[ guide.lang ]]</td>
+                                                <td v-if="guide.channel">[[ guide.channel.xmltv_id ]]</td>
+                                                <td v-else></td>
+                                                <td v-if="guide.channel">[[ guide.channel.name ]]</td>
+                                                <td v-else></td>
+                                                <td v-if="guide.channel">[[ guide.channel.city ]]</td>
+                                                <td v-else></td>
+                                                <td v-if="guide.channel">[[ guide.channel.country ]]</td>
+                                                <td v-else></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-primary" @click="selectGuide(guide)">
+                                                        Select
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Pagination -->
+                                <div class="pagination-container" v-if="allGuidesTotalPages > 1">
+                                    <nav aria-label="All guides pagination">
+                                        <ul class="pagination">
+                                            <li class="page-item" :class="{ disabled: allGuidesCurrentPage === 1 }">
+                                                <a class="page-link" href="#" @click.prevent="loadAllGuides(1)">First</a>
+                                            </li>
+                                            <li class="page-item" :class="{ disabled: allGuidesCurrentPage === 1 }">
+                                                <a class="page-link" href="#" @click.prevent="loadAllGuides(allGuidesCurrentPage - 1)">Previous</a>
+                                            </li>
+
+                                            <li v-for="page in allGuidesPaginationPages" :key="page" class="page-item" :class="{ active: allGuidesCurrentPage === page }">
+                                                <a class="page-link" href="#" @click.prevent="loadAllGuides(page)">[[ page ]]</a>
+                                            </li>
+
+                                            <li class="page-item" :class="{ disabled: allGuidesCurrentPage === allGuidesTotalPages }">
+                                                <a class="page-link" href="#" @click.prevent="loadAllGuides(allGuidesCurrentPage + 1)">Next</a>
+                                            </li>
+                                            <li class="page-item" :class="{ disabled: allGuidesCurrentPage === allGuidesTotalPages }">
+                                                <a class="page-link" href="#" @click.prevent="loadAllGuides(allGuidesTotalPages)">Last</a>
+                                            </li>
+                                        </ul>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide text filter modal -->
+    <div class="modal fade" id="filterGuideTextModal" tabindex="-1" aria-labelledby="filterGuideTextModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="filterTitleModalLabel">Filter by Text</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="titleFilter" placeholder="Search text..." v-model="allGuidesFilters.q"/>
+                        <span class="help-block">Searches in Site, Site Name, Site ID, XMLTV ID, and Channel Name.</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" @click="clearGuideFilter('q')">Clear</button>
+                    <button type="button" class="btn btn-sm btn-primary" @click="applyGuideFilter('q', allGuidesFilters.q)" :disabled="!allGuidesFilters.q">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide language filter modal -->
+    <div class="modal fade" id="filterGuideLangModal" tabindex="-1" aria-labelledby="filterGuideLangModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="filterTitleModalLabel">Filter by Language</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="titleFilter" placeholder="Search text..." v-model="allGuidesFilters.lang"/>
+                        <span class="help-block">Use two-letter country code (<a href="https://en.wikipedia.org/wiki/ISO_639-1" target="_blank">ISO 639-1</a>).</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" @click="clearGuideFilter('lang')">Clear</button>
+                    <button type="button" class="btn btn-sm btn-primary" @click="applyGuideFilter('lang', allGuidesFilters.lang)" :disabled="!allGuidesFilters.lang">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide country filter modal -->
+    <div class="modal fade" id="filterGuideCountryModal" tabindex="-1" aria-labelledby="filterGuideCountryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="filterProviderModalLabel">Filter by Country</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <select class="form-select" id="providerFilter" v-model="allGuidesFilters.country">
+                            <option v-for="country in countries" :value="country.code">[[ country.name ]]</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" @click="clearGuideFilter('country')">Clear</button>
+                    <button type="button" class="btn btn-sm btn-primary" @click="applyGuideFilter('country', allGuidesFilters.country)" :disabled="!allGuidesFilters.country">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide Confirmation Modal -->
+    <div class="modal fade" id="guideConfirmModal" tabindex="-1" aria-labelledby="guideConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="guideConfirmModalLabel">Confirm TV Guide Selection</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" v-if="selectedGuide">
+                    <div class="text-center mb-3" v-if="selectedGuide.channel && selectedGuide.channel.logo_url">
+                        <img :src="selectedGuide.channel.logo_url" style="max-height: 60px; max-width: 100%;" @error="handleLogoError">
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-4 fw-bold">Site:</div>
+                        <div class="col-8">[[ selectedGuide.site ]]</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-4 fw-bold">Site Name:</div>
+                        <div class="col-8">[[ selectedGuide.site_name ]]</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-4 fw-bold">Language:</div>
+                        <div class="col-8">[[ selectedGuide.lang ]]</div>
+                    </div>
+                    <div class="row mb-2" v-if="selectedGuide.channel">
+                        <div class="col-4 fw-bold">XMLTV ID:</div>
+                        <div class="col-8">[[ selectedGuide.channel.xmltv_id ]]</div>
+                    </div>
+                    <div class="row mb-2" v-if="selectedGuide.channel">
+                        <div class="col-4 fw-bold">Channel Name:</div>
+                        <div class="col-8">[[ selectedGuide.channel.name ]]</div>
+                    </div>
+                    <div class="row mb-2" v-if="selectedGuide.channel && selectedGuide.channel.city">
+                        <div class="col-4 fw-bold">City:</div>
+                        <div class="col-8">[[ selectedGuide.channel.city ]]</div>
+                    </div>
+                    <div class="row mb-2" v-if="selectedGuide.channel && selectedGuide.channel.country">
+                        <div class="col-4 fw-bold">Country:</div>
+                        <div class="col-8">[[ selectedGuide.channel.country ]]</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @click="assignGuideToChannel" :disabled="formSubmitting">
+                        <span v-if="formSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Assign
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide Not Found Modal -->
+    <div class="modal fade" id="guideNotFoundModal" tabindex="-1" aria-labelledby="guideNotFoundModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="guideNotFoundModalLabel">No Guide Found</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>No related TV guide channel was found for this stream.</p>
+                    <p>Try using the "Search..." feature to find a matching guide manually.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" @click="showGuideSearchModal(selectedChannel)">
+                        Search...
                     </button>
                 </div>
             </div>
@@ -517,6 +873,7 @@
             formSubmitting: false,
             providers: [],
             categories: [],
+            countries: [],
             selectedChannelCategories: [],
             newCategoryName: '',
             categoryError: null,
@@ -545,20 +902,51 @@
             // Filter Modals
             filterTitleModal: null,
             filterProviderModal: null,
+            filterGuideTextModal: null,
+            filterGuideLangModal: null,
+            filterGuideCountryModal: null,
+            // Guide Modals
+            guideConfirmModal: null,
+            guideNotFoundModal: null,
+            guideSearchModal: null,
+            selectedGuide: null,
+            // Guide Suggestions
+            guideSuggestions: [],
+            guideSuggestionsLoading: false,
+            guideSuggestionsError: null,
+            // All Guides
+            allGuides: [],
+            allGuidesLoading: false,
+            allGuidesError: null,
+            allGuidesCurrentPage: 1,
+            allGuidesTotalPages: 1,
+            allGuidesPageSize: 10,
+            allGuidesFilters: {
+                q: '',
+                lang: '',
+                country: ''
+            },
         },
         mounted() {
             this.fetchPlaylist();
             this.loadPage(1);
             this.fetchProviders();
             this.fetchCategories()
+            this.fetchCountries();
 
             // Initialize modals and offcanvas
             this.editChannelModal = new bootstrap.Modal(document.getElementById('editChannelModal'));
             this.streamsOffcanvas = new bootstrap.Offcanvas(document.getElementById('streamsOffcanvas'));
             this.newCategoryModal = new bootstrap.Modal(document.getElementById('newCategoryModal'));
             this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-            this.filterTitleModal = new bootstrap.Modal(document.getElementById('filterTitleModal'));
+            this.filterTitleModalfilterTitleModal = new bootstrap.Modal(document.getElementById('filterTitleModal'));
             this.filterProviderModal = new bootstrap.Modal(document.getElementById('filterProviderModal'));
+            this.guideConfirmModal = new bootstrap.Modal(document.getElementById('guideConfirmModal'));
+            this.guideNotFoundModal = new bootstrap.Modal(document.getElementById('guideNotFoundModal'));
+            this.guideSearchModal = new bootstrap.Modal(document.getElementById('guideSearchModal'));
+            this.filterGuideTextModal = new bootstrap.Modal(document.getElementById('filterGuideTextModal'));
+            this.filterGuideLangModal = new bootstrap.Modal(document.getElementById('filterGuideLangModal'));
+            this.filterGuideCountryModal = new bootstrap.Modal(document.getElementById('filterGuideCountryModal'));
 
             // Initialize Sortable.js after the DOM is updated
             this.$nextTick(() => {
@@ -607,6 +995,28 @@
                 // Show at most 5 pages, centered around the current page
                 const totalPages = this.availableStreamsTotalPages;
                 const currentPage = this.availableStreamsCurrentPage;
+
+                if (totalPages <= 5) {
+                    // If there are 5 or fewer pages, show all of them
+                    return Array.from({ length: totalPages }, (_, i) => i + 1);
+                } else {
+                    // Otherwise, show 5 pages centered around the current page
+                    let startPage = Math.max(currentPage - 2, 1);
+                    let endPage = startPage + 4;
+
+                    if (endPage > totalPages) {
+                        endPage = totalPages;
+                        startPage = Math.max(endPage - 4, 1);
+                    }
+
+                    return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+                }
+            },
+            allGuidesPaginationPages() {
+                // Generate an array of page numbers to display in pagination
+                // Show at most 5 pages, centered around the current page
+                const totalPages = this.allGuidesTotalPages;
+                const currentPage = this.allGuidesCurrentPage;
 
                 if (totalPages <= 5) {
                     // If there are 5 or fewer pages, show all of them
@@ -787,6 +1197,16 @@
                     })
                     .catch(error => {
                         console.error('Error fetching categories:', error);
+                    });
+            },
+
+            fetchCountries() {
+                axios.get(`/api/countries/`)
+                    .then(response => {
+                        this.countries = response.data;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching countries:', error);
                     });
             },
 
@@ -1112,6 +1532,227 @@
                 this.selectedChannel = channel;
                 this.deleteModal.show();
             },
+
+            // Guide methods
+            autoSelectGuide(channel) {
+                this.selectedChannel = channel;
+                this.formSubmitting = true;
+
+                // Call the API to get the top guide suggestion
+                axios.get(`/api/streams/${channel.provider_stream.id}/guides/`, {
+                    params: {
+                        max_results: 1
+                    }
+                })
+                .then(response => {
+                    this.formSubmitting = false;
+
+                    if (response.data && response.data.length > 0) {
+                        // Guide found, show confirmation modal
+                        this.selectedGuide = response.data[0];
+                        this.guideConfirmModal.show();
+                    } else {
+                        // No guide found, show not found modal
+                        this.guideNotFoundModal.show();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching guide suggestions:', error);
+                    this.formSubmitting = false;
+                    this.error = 'Failed to fetch guide suggestions. Please try again.';
+                });
+            },
+
+            assignGuideToChannel() {
+                if (!this.selectedChannel || !this.selectedGuide) {
+                    return;
+                }
+
+                this.formSubmitting = true;
+
+                // Call the API to update the channel with the selected guide
+                axios.patch(`/api/channels/${this.selectedChannel.id}/`, {
+                    guide_id: this.selectedGuide.id
+                })
+                .then(_ => {
+                    // Close modals
+                    this.guideConfirmModal.hide();
+                    this.guideSearchModal.hide();
+
+                    // Refresh channels
+                    this.loadPage(this.currentPage);
+
+                    // Reset form
+                    this.formSubmitting = false;
+                    this.selectedGuide = null;
+                })
+                .catch(error => {
+                    console.error('Error updating channel guide:', error);
+                    this.formSubmitting = false;
+                    this.error = 'Failed to update channel guide. Please try again.';
+                });
+            },
+
+            showGuideSearchModal(channel) {
+                if (this.guideConfirmModal._isShown) {
+                    this.guideConfirmModal.hide()
+                }
+                if (this.guideNotFoundModal._isShown) {
+                    this.guideNotFoundModal.hide()
+                }
+
+                this.selectedChannel = channel;
+                this.guideSuggestions = [];
+                this.guideSuggestionsLoading = false;
+                this.guideSuggestionsError = null;
+                this.allGuides = [];
+                this.allGuidesLoading = false;
+                this.allGuidesError = null;
+                this.allGuidesCurrentPage = 1;
+                this.allGuidesTotalPages = 1;
+                this.allGuidesFilters = {
+                    q: '',
+                    lang: '',
+                    country: ''
+                };
+
+                // Show modal
+                this.guideSearchModal.show();
+
+                // Load guide suggestions
+                this.loadGuideSuggestions();
+            },
+
+            loadGuideSuggestions() {
+                if (!this.selectedChannel || !this.selectedChannel.provider_stream) {
+                    return;
+                }
+
+                this.guideSuggestionsLoading = true;
+                this.guideSuggestionsError = null;
+
+                // Call the API to get guide suggestions
+                axios.get(`/api/streams/${this.selectedChannel.provider_stream.id}/guides/`, {
+                    params: {
+                        max_results: 12
+                    }
+                })
+                .then(response => {
+                    this.guideSuggestionsLoading = false;
+                    this.guideSuggestions = response.data;
+                })
+                .catch(error => {
+                    console.error('Error fetching guide suggestions:', error);
+                    this.guideSuggestionsLoading = false;
+                    this.guideSuggestionsError = 'Failed to fetch guide suggestions. Please try again.';
+                });
+            },
+
+            loadAllGuides(page = 1) {
+                this.allGuidesLoading = true;
+                this.allGuidesError = null;
+
+                // Build params object with all filters
+                const params = {
+                    page: page,
+                    page_size: this.allGuidesPageSize
+                };
+
+                // Add filters if they exist
+                if (this.allGuidesFilters.q) {
+                    params.q = this.allGuidesFilters.q;
+                }
+                if (this.allGuidesFilters.lang) {
+                    params.lang = this.allGuidesFilters.lang;
+                }
+                if (this.allGuidesFilters.country) {
+                    params.country = this.allGuidesFilters.country;
+                }
+
+                // Call the API to get all guides
+                axios.get('/api/guides/', { params })
+                .then(response => {
+                    this.allGuides = response.data.items;
+                    this.allGuidesCurrentPage = response.data.page;
+                    this.allGuidesTotalPages = Math.ceil(response.data.total / this.allGuidesPageSize);
+                    this.allGuidesLoading = false;
+                })
+                .catch(error => {
+                    console.error('Error fetching guides:', error);
+                    this.allGuidesError = 'Failed to fetch guides. Please try again.';
+                    this.allGuidesLoading = false;
+                });
+            },
+
+            clearAllGuidesFilters() {
+                this.allGuidesFilters = {
+                    q: '',
+                    lang: '',
+                    country: ''
+                };
+                this.loadAllGuides(1);
+            },
+
+            selectGuide(guide) {
+                this.selectedGuide = guide;
+                this.guideConfirmModal.show();
+            },
+
+            showGuideFilter(event, filterType) {
+                // Show the appropriate modal based on filter type
+                if (filterType === 'q') {
+                    this.filterGuideTextModal.show();
+                } else if (filterType === 'lang') {
+                    this.filterGuideLangModal.show();
+                } else if (filterType === 'country') {
+                    this.filterGuideCountryModal.show();
+                }
+            },
+
+            applyGuideFilter(filterType, value) {
+                // Apply the filter
+                this.allGuidesFilters[filterType] = value;
+
+                // Close the appropriate modal
+                if (filterType === 'q') {
+                    this.filterGuideTextModal.hide();
+                } else if (filterType === 'lang') {
+                    this.filterGuideLangModal.hide();
+                } else if (filterType === 'country') {
+                    this.filterGuideCountryModal.hide();
+                }
+
+                // Reload with new filter
+                this.loadAllGuides(1);
+            },
+
+            clearGuideFilter(filterType) {
+                // Clear the filter
+                this.allGuidesFilters[filterType] = '';
+
+                // Close the appropriate modal
+                if (filterType === 'q') {
+                    this.filterGuideTextModal.hide();
+                } else if (filterType === 'lang') {
+                    this.filterGuideLangModal.hide();
+                } else if (filterType === 'country') {
+                    this.filterGuideCountryModal.hide();
+                }
+
+                // Reload without this filter
+                this.loadAllGuides(1);
+            },
+
+            clearGuideFilterAll() {
+                // Clear the filters
+                this.allGuidesFilters['q'] = '';
+                this.allGuidesFilters['lang'] = '';
+                this.allGuidesFilters['country'] = '';
+
+                // Reload without this filter
+                this.loadAllGuides(1);
+            },
+
         }
     });
 </script>

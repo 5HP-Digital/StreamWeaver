@@ -369,6 +369,8 @@ class ChannelsViewSet(viewsets.ViewSet):
 
                 # Now set the final order
                 channel.order = new_order
+            if 'guide_id' in serializer.validated_data:
+                channel.guide_id = serializer.validated_data['guide_id']
 
             channel.save()
             return Response(status=status.HTTP_204_NO_CONTENT)
