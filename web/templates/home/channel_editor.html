@@ -142,7 +142,7 @@
                                     <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                                         TV Guide
                                     </button>
-                                    <ul class="dropdown-menu">
+                                    <ul class="dropdown-menu" data-bs-boundary="viewport">
                                         <li><a class="dropdown-item" href="#" @click.prevent="autoSelectGuide(channel)">Auto-Select</a></li>
                                         <li><a class="dropdown-item" href="#" @click.prevent="showGuideSearchModal(channel)">Search...</a></li>
                                     </ul>
@@ -847,6 +847,7 @@
         data: {
             playlistId: "{{ playlist_id }}",
             playlistName: '',
+            defaultLang: 'en',
             channels: [],
             loading: true,
             error: null,
@@ -939,7 +940,7 @@
             this.streamsOffcanvas = new bootstrap.Offcanvas(document.getElementById('streamsOffcanvas'));
             this.newCategoryModal = new bootstrap.Modal(document.getElementById('newCategoryModal'));
             this.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-            this.filterTitleModalfilterTitleModal = new bootstrap.Modal(document.getElementById('filterTitleModal'));
+            this.filterTitleModal = new bootstrap.Modal(document.getElementById('filterTitleModal'));
             this.filterProviderModal = new bootstrap.Modal(document.getElementById('filterProviderModal'));
             this.guideConfirmModal = new bootstrap.Modal(document.getElementById('guideConfirmModal'));
             this.guideNotFoundModal = new bootstrap.Modal(document.getElementById('guideNotFoundModal'));
@@ -1040,6 +1041,7 @@
                 axios.get(`/api/playlists/${this.playlistId}/`)
                     .then(response => {
                         this.playlistName = response.data.name;
+                        this.defaultLang = response.data.default_lang;
                     })
                     .catch(error => {
                         console.error('Error fetching playlist:', error);
@@ -1328,7 +1330,7 @@
                 // Show the appropriate modal based on filter type
                 if (filterType === 'q') {
                     this.filterTitleModal.show();
-                } else if (filterType === 'provider') {
+                } else if (filterType === 'provider_id') {
                     this.filterProviderModal.show();
                 }
             },
@@ -1541,7 +1543,8 @@
                 // Call the API to get the top guide suggestion
                 axios.get(`/api/streams/${channel.provider_stream.id}/guides/`, {
                     params: {
-                        max_results: 1
+                        max_results: 1,
+                        lang: this.defaultLang
                     }
                 })
                 .then(response => {
@@ -1634,7 +1637,8 @@
                 // Call the API to get guide suggestions
                 axios.get(`/api/streams/${this.selectedChannel.provider_stream.id}/guides/`, {
                     params: {
-                        max_results: 12
+                        max_results: 12,
+                        lang: this.defaultLang,
                     }
                 })
                 .then(response => {

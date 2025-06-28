@@ -356,7 +356,15 @@ class ProviderStreamsViewSet(viewsets.ViewSet):
         stream = get_object_or_404(ProviderStream, pk=pk)
 
         # Get query parameters
+        lang = request.query_params.get('lang')
+
         title = request.query_params.get('title', stream.title)
+        if not title:
+            return Response(
+                {"error": "title is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             max_results = int(request.query_params.get('max_results', 5))
             if max_results < 1 or max_results > 20:
@@ -370,14 +378,11 @@ class ProviderStreamsViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not title:
-            return Response(
-                {"error": "title is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         # Apply matching rules
         query = Guide.objects.all().select_related('channel')
+
+        if lang:
+            query = query.filter(lang=lang)
 
         # Rule 1: Stream.tvg_id matches exactly Guide.xmltv_id
         xmltv_matches = query.alias(
