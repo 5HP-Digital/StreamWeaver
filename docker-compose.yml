@@ -12,15 +12,27 @@
       - migration
 
   job-worker:
-    build:
-      context: ./IPTV.JobWorker
+    build: ./IPTV.JobWorker
     restart: always
     environment:
       - DOTNET_ENVIRONMENT=Development
+      - EPG_SERVICE=http://epg-service:3000
     volumes:
       - ./config:/config
     depends_on:
+      - epg-worker
       - migration
+  
+  epg-service:
+    build: ./epg
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config:/config
+    environment:
+      - MAX_CONNECTIONS=1
+      - DAYS=14
+      - GZIP=false
 
   migration:
     build:

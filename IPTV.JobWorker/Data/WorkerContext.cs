@@ -55,6 +55,17 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
         {
             // Properties
         });
+        
+        // PlaylistEpgGenJob
+        modelBuilder.Entity<PlaylistEpgGenJob>(builder =>
+        {
+            // Relationships
+            builder.HasOne(e => e.Playlist)
+                .WithMany()
+                .IsRequired()
+                .HasForeignKey("playlist_id")
+                .OnDelete(DeleteBehavior.Cascade);
+        });
 
         // Job
         modelBuilder.Entity<Job>(builder =>
@@ -64,7 +75,8 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
             builder.HasKey(e => e.Id);
             builder.HasDiscriminator(j => j.Type)
                 .HasValue<ProviderSyncJob>(JobType.ProviderSync)
-                .HasValue<EpgDataSyncJob>(JobType.EpgDataSync);
+                .HasValue<EpgDataSyncJob>(JobType.EpgDataSync)
+                .HasValue<PlaylistEpgGenJob>(JobType.PlaylistEpgGen);
 
             // Properties
             builder.Property(e => e.Id)
@@ -190,6 +202,87 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
             builder.HasOne(e => e.Provider)
                 .WithMany(e => e.Streams)
                 .HasForeignKey("provider_id")
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // Playlist
+        modelBuilder.Entity<Playlist>(builder =>
+        {
+            // Table
+            builder.ToTable("playlist_manager_playlist");
+            builder.HasKey(e => e.Id);
+            
+            // Properties
+            builder.Property(e => e.Id)
+                .ValueGeneratedOnAdd();
+            builder.Property(e => e.Name)
+                .HasMaxLength(255)
+                .IsRequired();
+            builder.Property(e => e.StartingChannelNumber)
+                .IsRequired();
+            builder.Property(e => e.DefaultLang)
+                .HasMaxLength(20)
+                .IsRequired();
+            builder.Property(e => e.CreatedAt)
+                .ValueGeneratedOnAdd()
+                .IsRequired();
+            builder.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAdd()
+                .IsRequired();
+            
+            // Relationships
+            builder.HasMany(e => e.Channels)
+                .WithOne(e => e.Playlist)
+                .HasForeignKey("playlist_id")
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // PlaylistChannel
+        modelBuilder.Entity<PlaylistChannel>(builder =>
+        {
+            // Table
+            builder.ToTable("playlist_manager_playlistchannel");
+            builder.HasKey(e => e.Id);
+            
+            // Properties
+            builder.Property(e => e.Id)
+                .ValueGeneratedOnAdd();
+
+            builder.Property(e => e.Title)
+                .HasMaxLength(255);
+
+            builder.Property(e => e.LogoUrl)
+                .HasColumnType("text");
+
+            builder.Property(e => e.Category)
+                .HasMaxLength(255);
+
+            builder.Property(e => e.Order)
+                .IsRequired();
+
+            builder.Property(e => e.CreatedAt)
+                .ValueGeneratedOnAdd()
+                .IsRequired();
+
+            builder.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAdd()
+                .IsRequired();
+
+            // Relationships
+            builder.HasOne(e => e.Guide)
+                .WithMany(e => e.PlaylistChannels)
+                .HasForeignKey("guide_id")
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.HasOne(e => e.Stream)
+                .WithMany()
+                .HasForeignKey("stream_id")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            builder.HasOne(e => e.Playlist)
+                .WithMany(e => e.Channels)
+                .HasForeignKey("playlist_id")
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -329,6 +422,10 @@ public class WorkerContext(IConfiguration config, ILoggerFactory loggerFactory, 
                 .HasMaxLength(20);
 
             // Relationships
+            builder.HasMany(e => e.PlaylistChannels)
+                .WithOne(e => e.Guide)
+                .HasForeignKey("guide_id")
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Indexes
         });

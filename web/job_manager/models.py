@@ -1,12 +1,14 @@
 from django.db import models
 import uuid
 
+
 class JobType(models.TextChoices):
     """
     Enum representing the type of job.
     """
     PROVIDER_SYNC = 'ProviderSync'
     EPG_DATA_SYNC = 'EpgDataSync'
+    PLAYLIST_EPG_GEN = 'PlaylistEpgGen'
 
 class JobState(models.TextChoices):
     """
@@ -43,6 +45,15 @@ class Job(models.Model):
     allow_stream_auto_deletion = models.BooleanField(default=True, null=True, blank=True)
     provider = models.ForeignKey(
         'provider_manager.Provider',
+        on_delete=models.CASCADE,
+        related_name='jobs',
+        null=True,
+        blank=True,
+    )
+
+    # PlaylistEpgGen
+    playlist = models.ForeignKey(
+        'playlist_manager.Playlist',
         on_delete=models.CASCADE,
         related_name='jobs',
         null=True,

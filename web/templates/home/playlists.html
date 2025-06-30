@@ -80,6 +80,10 @@
                         <span v-else>[[ 0 ]]</span>
                         <span v-if="playlist.inactive_channel_count > 0">([[ playlist.inactive_channel_count ]] inactive)</span>
                     </p>
+                    <p v-if="playlist.has_epg" class="card-text">
+                        <strong>TV Guide:</strong>
+                        <a :href="'/api/playlists/' + playlist.id + '/guide.xml'" target="_blank">Download</a>
+                    </p>
                     <p class="card-text">
                         <small class="text-muted">
                             Created: [[ formatDate(playlist.created_at) ]]<br>
@@ -280,6 +284,7 @@
                 default_lang: 'en',
                 channel_count: 0,
                 inactive_channel_count: 0,
+                has_epg: false,
                 created_at: null,
                 updated_at: null
             },

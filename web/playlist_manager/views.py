@@ -1,10 +1,15 @@
-﻿from django.db import transaction
+﻿from fileinput import filename
+
+from django.db import transaction
 from django.db.models import Max, F, Q
 from django.shortcuts import get_object_or_404
+from django.http import FileResponse, Http404
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from math import ceil
+import os
+from django.conf import settings
 
 from .models import Playlist, PlaylistChannel
 from .serializers import (
@@ -16,6 +21,7 @@ from .serializers import (
     PlaylistChannelUpdateSerializer,
     ProviderStreamWithDetailsSerializer
 )
+from job_manager.models import JobState, JobType
 from provider_manager.models import ProviderStream
 
 
@@ -309,6 +315,61 @@ class PlaylistsViewSet(viewsets.ViewSet):
             response_data['links']['last'] = f"{base_url}{query_prefix}page={total_pages}"
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def epg_sync(self, request, pk=None):
+        """
+        Manually trigger a playlist EPG generation job for a specific playlist.
+
+        Returns:
+            Response: A response containing the job ID and initial status.
+        """
+        playlist = get_object_or_404(Playlist, pk=pk)
+
+        # Check if there's already a sync job in progress or queued for this playlist
+        active_jobs = playlist.jobs.filter(state__in=[JobState.QUEUED, JobState.IN_PROGRESS])
+
+        if active_jobs.exists():
+            job = active_jobs.first()
+            return Response({
+                "job_id": str(job.job_id),
+                "status": job.state,
+                "message": job.status_description
+            })
+
+        # Create the job
+        job = playlist.jobs.create(
+            type=JobType.PLAYLIST_EPG_GEN,
+            state=JobState.QUEUED,
+            max_attempts=1, # when running manual sync, allow one failure only
+        )
+
+        return Response({
+            "job_id": str(job.job_id),
+            "status": "queued",
+            "message": "Generation job queued successfully"
+        })
+
+    @action(detail=True, methods=['get'], url_path='guide.xml')
+    def epg(self, request, pk=None):
+        """
+        Download the guide.xml file for a specific playlist if it exists.
+
+        Returns:
+            FileResponse: The guide.xml file if it exists
+            Http404: If the file doesn't exist
+        """
+        _ = get_object_or_404(Playlist, pk=pk)
+
+        # Construct the file path
+        file_path = os.path.join(settings.CONFIG_DIR, f"playlists/{pk}/guide.xml")
+
+        # Check if the file exists
+        if not os.path.exists(file_path):
+            raise Http404("Guide.xml file not found")
+
+        # Return the file as a response
+        return FileResponse(open(file_path, 'rb'), content_type='application/xml', as_attachment=True, filename=f"playlist_{pk}_guide.xml")
 
 
 class ChannelsViewSet(viewsets.ViewSet):

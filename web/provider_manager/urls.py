@@ -1,9 +1,9 @@
 ﻿from django.urls import path, include
-from rest_framework.routers import DefaultRouter
 
 from .views import ProvidersViewSet, ProviderStreamsViewSet
+from main.custom_default_router import CustomDefaultRouter
 
-router = DefaultRouter()
+router = CustomDefaultRouter()
 router.register(r'providers', ProvidersViewSet, basename='providers')
 router.register(r'streams', ProviderStreamsViewSet, basename='streams')
 

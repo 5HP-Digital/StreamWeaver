@@ -13,4 +13,6 @@ public class Guide
     public required string Lang { get; set; }
 
     public string? XmltvId { get; set; }
+
+    public virtual ICollection<PlaylistChannel> PlaylistChannels { get; init; } = [];
 }

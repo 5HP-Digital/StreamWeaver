@@ -1,4 +1,8 @@
-﻿from rest_framework import serializers
+﻿import os
+from django.conf import settings
+from pathlib import Path
+from rest_framework import serializers
+
 from .models import Playlist, PlaylistChannel
 from provider_manager.models import ProviderStream
 from provider_manager.serializers import ProviderStreamSerializer
@@ -12,11 +16,12 @@ class PlaylistSerializer(serializers.ModelSerializer):
     """
     channel_count = serializers.SerializerMethodField()
     inactive_channel_count = serializers.SerializerMethodField()
+    has_epg = serializers.SerializerMethodField()
 
     class Meta:
         model = Playlist
-        fields = ['id', 'name', 'starting_channel_number', 'default_lang', 'created_at', 'updated_at', 'channel_count', 'inactive_channel_count']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'channel_count', 'inactive_channel_count']
+        fields = ['id', 'name', 'starting_channel_number', 'default_lang', 'created_at', 'updated_at', 'channel_count', 'inactive_channel_count', 'has_epg']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'channel_count', 'inactive_channel_count', 'has_epg']
 
     def get_channel_count(self, obj):
         """
@@ -29,6 +34,13 @@ class PlaylistSerializer(serializers.ModelSerializer):
         Get the number of deactivated channels associated with this Playlist.
         """
         return obj.channels.filter(provider_stream__is_active=False).count()
+    
+    def get_has_epg(self, obj):
+        """
+        Get whether the Playlist has EPG generated for it. 
+        """
+        guide_path = os.path.join(settings.CONFIG_DIR, f"playlists/{obj.id}/guide.xml")
+        return Path(guide_path).exists()
 
 
 class PlaylistCreateSerializer(serializers.ModelSerializer):

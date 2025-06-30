@@ -23,13 +23,13 @@ public class PollingWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Provider sync worker starting");
+        logger.LogInformation("Job worker starting");
         
         while (await _timer.WaitForNextTickAsync(cancellationToken: stoppingToken))
         {
             try
             {
-                logger.LogInformation("Provider sync worker running at: {time}", timeProvider.GetUtcNow());
+                logger.LogInformation("Job worker running at: {time}", timeProvider.GetUtcNow());
 
                 await Poll(stoppingToken);
             }
@@ -44,7 +44,7 @@ public class PollingWorker(
             }
         }
         
-        logger.LogInformation("Provider sync worker stopping");
+        logger.LogInformation("Job worker stopping");
     }
 
     private async Task Poll(CancellationToken stoppingToken)
@@ -91,6 +91,11 @@ public class PollingWorker(
                 case JobType.EpgDataSync:
                     var epgOrgDataSynchronizer = scope.ServiceProvider.GetRequiredService<EpgOrgDataSynchronizer>();
                     (success, description) = await epgOrgDataSynchronizer.Run(cancellationToken: stoppingToken);
+                    break;
+                case JobType.PlaylistEpgGen:
+                    var playlistEpgGenJob = (PlaylistEpgGenJob)job;
+                    var playlistEpgGenerator = scope.ServiceProvider.GetRequiredService<PlaylistEpgGenerator>();
+                    (success, description) = await playlistEpgGenerator.Run(playlistEpgGenJob.Playlist, cancellationToken: stoppingToken);
                     break;
                 default:
                     throw new NotSupportedException($"Unsupported job type: {job.Type}");

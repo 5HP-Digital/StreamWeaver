@@ -3,5 +3,6 @@
 public enum JobType
 {
     ProviderSync,
-    EpgDataSync
+    EpgDataSync,
+    PlaylistEpgGen
 }
